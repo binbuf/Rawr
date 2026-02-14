@@ -150,10 +150,29 @@ namespace Rawr
             _ = syncService?.SyncAsync(CancellationToken.None);
         }
 
+        private SettingsWindow? _settingsWindow;
+
         private void OnSettingsClick(object? sender, EventArgs e)
         {
-            // For now, just open dashboard as settings are part of it or not yet implemented
-            OnDashboardClick(sender, e);
+            if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+            {
+                if (_settingsWindow != null)
+                {
+                    _settingsWindow.Activate();
+                    return;
+                }
+
+                var settingsVm = Services?.GetRequiredService<SettingsViewModel>();
+                if (settingsVm != null)
+                {
+                    _settingsWindow = new SettingsWindow
+                    {
+                        DataContext = settingsVm
+                    };
+                    _settingsWindow.Closed += (s, ev) => _settingsWindow = null;
+                    _settingsWindow.Show();
+                }
+            }
         }
 
         private void OnExitClick(object? sender, EventArgs e)
@@ -255,8 +274,14 @@ namespace Rawr
             
             var refreshEventsItem = new NativeMenuItem("Refresh Events List");
             refreshEventsItem.Click += (s, e) => {
-                eventBasedMenu.Items.Clear();
-                eventBasedMenu.Items.Add(refreshEventsItem);
+                // Remove all items except the refresh item itself
+                for (int i = eventBasedMenu.Items.Count - 1; i >= 0; i--)
+                {
+                    if (eventBasedMenu.Items[i] != refreshEventsItem)
+                    {
+                        eventBasedMenu.Items.RemoveAt(i);
+                    }
+                }
                 eventBasedMenu.Items.Add(new NativeMenuItemSeparator());
                 
                 Task.Run(async () => {
@@ -268,6 +293,12 @@ namespace Rawr
                                     .ToList();
 
                     Dispatcher.UIThread.Post(() => {
+                        if (evts.Count == 0)
+                        {
+                            eventBasedMenu.Items.Add(new NativeMenuItem("(No events found)"));
+                            return;
+                        }
+
                         foreach (var evt in evts)
                         {
                             var evtItem = new NativeMenuItem($"{evt.Start.ToLocalTime():t} - {evt.Title}");

@@ -1,68 +1,125 @@
 using System;
 using System.Collections.Generic;
+using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace Rawr.Core.Configuration;
 
-public class RawrConfig
+public partial class RawrConfig : ObservableObject
 {
-    public GeneralConfig General { get; set; } = new();
-    public TimeAwarenessConfig TimeAwareness { get; set; } = new();
-    public CalendarConfig Calendar { get; set; } = new();
-    public VoiceConfig Voice { get; set; } = new();
-    public LoggingConfig Logging { get; set; } = new();
-    public LinuxConfig Linux { get; set; } = new();
+    [ObservableProperty]
+    private GeneralConfig _general = new();
+
+    [ObservableProperty]
+    private TimeAwarenessConfig _timeAwareness = new();
+
+    [ObservableProperty]
+    private CalendarConfig _calendar = new();
+
+    [ObservableProperty]
+    private VoiceConfig _voice = new();
+
+    [ObservableProperty]
+    private LoggingConfig _logging = new();
+
+    [ObservableProperty]
+    private LinuxConfig _linux = new();
 }
 
-public class GeneralConfig
+public partial class GeneralConfig : ObservableObject
 {
-    public bool StartWithOS { get; set; } = true;
-    public int MissedEventThresholdMinutes { get; set; } = 60;
-    public int HeartbeatIntervalSeconds { get; set; } = 30;
+    [ObservableProperty]
+    private bool _startWithOS = true;
+
+    [ObservableProperty]
+    private int _missedEventThresholdMinutes = 60;
+
+    [ObservableProperty]
+    private int _heartbeatIntervalSeconds = 30;
 }
 
-public class TimeAwarenessConfig
+public partial class TimeAwarenessConfig : ObservableObject
 {
-    public bool Enabled { get; set; } = false;
-    public int IntervalMinutes { get; set; } = 60;
-    public string Sound { get; set; } = "Chime"; // or "Voice"
+    [ObservableProperty]
+    private bool _enabled = false;
+
+    [ObservableProperty]
+    private int _intervalMinutes = 60;
+
+    [ObservableProperty]
+    private string _sound = "Chime"; // or "Voice"
 }
 
-public class CalendarConfig
+public partial class CalendarConfig : ObservableObject
 {
-    public int LookAheadHours { get; set; } = 48;
-    public List<CalendarSource> Sources { get; set; } = new();
-    public int SyncIntervalMinutes { get; set; } = 15;
+    [ObservableProperty]
+    private int _lookAheadHours = 48;
+
+    [ObservableProperty]
+    private List<CalendarSource> _sources = new();
+
+    [ObservableProperty]
+    private int _syncIntervalMinutes = 15;
 }
 
-public class CalendarSource
+public partial class CalendarSource : ObservableObject
 {
-    public string Id { get; set; } = Guid.NewGuid().ToString();
-    public string Name { get; set; } = "Personal";
-    public string Uri { get; set; } = string.Empty;
-    public string Type { get; set; } = "Remote"; 
-    public string AuthType { get; set; } = "PrivateUrl"; // "PrivateUrl" or "Basic"
-    public string Color { get; set; } = "#FF0000";
-    public bool Enabled { get; set; } = true;
+    [ObservableProperty]
+    private string _id = Guid.NewGuid().ToString();
+
+    [ObservableProperty]
+    private string _name = "Personal";
+
+    [ObservableProperty]
+    private string _uri = string.Empty;
+
+    [ObservableProperty]
+    private string _type = "Remote"; 
+
+    [ObservableProperty]
+    private string _authType = "PrivateUrl"; // "PrivateUrl" or "Basic"
+
+    [ObservableProperty]
+    private string _color = "#FF0000";
+
+    [ObservableProperty]
+    private bool _enabled = true;
 }
 
-public class VoiceConfig
+public partial class VoiceConfig : ObservableObject
 {
-    public string Engine { get; set; } = "Auto";
-    public string VoiceId { get; set; } = "Default";
-    public string DeviceId { get; set; } = "Default";
-    public double Rate { get; set; } = 1.0;
-    public int Volume { get; set; } = 100;
-    public bool Muted { get; set; } = false;
+    [ObservableProperty]
+    private string _engine = "Auto";
+
+    [ObservableProperty]
+    private string _voiceId = "Default";
+
+    [ObservableProperty]
+    private string _deviceId = "Default";
+
+    [ObservableProperty]
+    private double _rate = 1.0;
+
+    [ObservableProperty]
+    private int _volume = 100;
+
+    [ObservableProperty]
+    private bool _muted = false;
 }
 
-public class LoggingConfig
+public partial class LoggingConfig : ObservableObject
 {
-    public string Level { get; set; } = "Information";
-    public int RetentionDays { get; set; } = 7;
+    [ObservableProperty]
+    private string _level = "Information";
+
+    [ObservableProperty]
+    private int _retentionDays = 7;
 }
 
-public class LinuxConfig
+public partial class LinuxConfig : ObservableObject
 {
-    public bool ForceCustomWindow { get; set; } = false;
-    public string NotificationUrgency { get; set; } = "Critical";
+    [ObservableProperty]
+    private bool _forceCustomWindow = false;
+
+    [ObservableProperty]
+    private string _notificationUrgency = "Critical";
 }

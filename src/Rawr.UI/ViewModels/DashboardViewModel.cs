@@ -139,32 +139,66 @@ public partial class DashboardViewModel : ObservableObject
 
         
 
-            public async Task RefreshEventsAsync()
-
-            {
-
-                if (_calendarRepository == null) return;
+                public async Task RefreshEventsAsync()
 
         
 
-                var allEvents = await _calendarRepository.GetAllEventsAsync();
-
-                var now = DateTimeOffset.Now;
-
-                var end = now.AddHours(_settingsManager.Settings.Calendar.LookAheadHours);
+                {
 
         
 
-                var events = allEvents
+                    if (_calendarRepository == null) return;
 
-                    .Where(e => e.Start >= now && e.Start <= end)
+        
 
-                    .OrderBy(e => e.Start);
+            
 
-                    
+        
 
-                UpcomingEvents = new ObservableCollection<CalendarEvent>(events);
+                    var allEvents = await _calendarRepository.GetAllEventsAsync();
 
-            }
+        
+
+                    var now = DateTimeOffset.Now;
+
+        
+
+                    var threshold = now.AddMinutes(-_settingsManager.Settings.General.MissedEventThresholdMinutes);
+
+        
+
+                    var end = now.AddHours(_settingsManager.Settings.Calendar.LookAheadHours);
+
+        
+
+            
+
+        
+
+                    var events = allEvents
+
+        
+
+                        .Where(e => e.End >= now && e.Start <= end || e.Start >= threshold && e.Start <= end)
+
+        
+
+                        .OrderBy(e => e.Start);
+
+        
+
+                        
+
+        
+
+                    UpcomingEvents = new ObservableCollection<CalendarEvent>(events);
+
+        
+
+                }
+
+        
+
+            
 
         }
