@@ -40,7 +40,7 @@
                             <Grid ColumnDefinitions="*, Auto" Margin="0,5">
                                 <StackPanel>
                                     <TextBlock Text="{Binding Title}" FontWeight="Bold"/>
-                                    <TextBlock Text="{Binding Start, StringFormat='{}{0:t}'}" FontStyle="Italic"/>
+                                    <TextBlock Text="{Binding LocalTime, StringFormat='{}{0:t}'}" FontStyle="Italic"/>
                                 </StackPanel>
                                 <Button Grid.Column="1" Content="Dismiss" 
                                         Command="{Binding $parent[Window].((vm:DashboardViewModel)DataContext).DismissAlertCommand}" 
@@ -55,7 +55,7 @@
         <!-- Main Content -->
         <DataGrid Grid.Row="1" Margin="10" ItemsSource="{Binding UpcomingEvents}" AutoGenerateColumns="False" IsReadOnly="True" GridLinesVisibility="All" BorderThickness="1" BorderBrush="Gray">
           <DataGrid.Columns>
-            <DataGridTextColumn Header="Time" Binding="{Binding Start, StringFormat='{}{0:g}'}" Width="Auto" />
+            <DataGridTextColumn Header="Time" Binding="{Binding LocalTime, StringFormat='{}{0:g}'}" Width="Auto" />
             <DataGridTextColumn Header="Title" Binding="{Binding Title}" Width="*" />
             <DataGridTextColumn Header="Location" Binding="{Binding Location}" Width="2*" />
             <DataGridCheckBoxColumn Header="All Day" Binding="{Binding IsAllDay}" Width="Auto" />

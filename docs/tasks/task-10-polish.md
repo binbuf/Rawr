@@ -10,10 +10,7 @@ Prepare the application for use.
 2.  **Credential Storage**:
     *   Implement secure storage for Basic Auth passwords if strictly needed (using `CredentialManagement` package for Windows). *Low priority if PrivateUrl is primary*.
 
-3.  **Release Build**:
-    *   Configure `publish` profiles.
-    *   Ensure assets (sounds, icons) are copied correctly.
-    *   Test `Release` mode (optimizations can sometimes break reflection/serialization).
+3. **Add data reset**:
+  * Add a button in Settings to erase all calendar event data and start fresh.
 
-## Verification
-*   Full end-to-end test of a "Fresh Install" scenario.
+4. Add configurable option to hide UI popup if fullscreen borderless or fullscreen exclusive (and their equivalaents on MacOS and Linux)

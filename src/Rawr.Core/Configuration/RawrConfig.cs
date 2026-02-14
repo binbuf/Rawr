@@ -55,6 +55,9 @@ public partial class NotificationConfig : ObservableObject
 
     [ObservableProperty]
     private int _durationSeconds = 10;
+
+    [ObservableProperty]
+    private bool _hideOnFullscreen = true;
 }
 
 public partial class TimeAwarenessConfig : ObservableObject

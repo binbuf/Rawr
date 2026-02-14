@@ -13,6 +13,8 @@ public class CalendarEvent
     public bool IsAllDay { get; set; }
     public string SourceId { get; set; } = string.Empty;
 
+    public DateTime LocalTime => Start.LocalDateTime;
+
     public DateTime? OriginalStartTime { get; set; }
     public string? OriginalTimeZoneId { get; set; }
 }

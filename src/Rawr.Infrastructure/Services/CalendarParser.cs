@@ -78,37 +78,22 @@ public class CalendarParser : ICalendarParser
                 }
 
                 DateTimeOffset startDt;
-                if (s.IsUtc)
+                try
                 {
-                    startDt = new DateTimeOffset(s.Value, TimeSpan.Zero);
+                    // Convert to UTC first using Ical.Net's internal resolution, then wrap in DateTimeOffset
+                    var utcDt = s.AsUtc;
+                    startDt = new DateTimeOffset(utcDt, TimeSpan.Zero);
                 }
-                else if (s.TzId != null)
+                catch
                 {
-                    try
+                    if (s.IsUtc)
                     {
-                        // Resolve the timezone and get the offset for the specific time
-                        var tzid = s.TzId;
-                        var dt = s.Value;
-                        
-                        // Ical.Net's CalDateTime has a 'Value' which is the local time.
-                        // We need to find the offset for this time in the given TzId.
-                        // However, Ical.Net usually handles this during parsing if the VTIMEZONE is present.
-                        
-                        // Let's try to get it via the calendar's timezone resolution if possible
-                        // But since we are iterating occurrences, they should already be resolved or have TzId.
-                        
-                        // A more robust way in Ical.Net to get UTC from a CalDateTime:
-                        var utcDt = s.AsUtc;
-                        startDt = new DateTimeOffset(utcDt, TimeSpan.Zero);
+                        startDt = new DateTimeOffset(s.Value, TimeSpan.Zero);
                     }
-                    catch
+                    else
                     {
-                         startDt = new DateTimeOffset(s.Value, TimeZoneInfo.Local.GetUtcOffset(s.Value));
+                        startDt = new DateTimeOffset(s.Value, TimeZoneInfo.Local.GetUtcOffset(s.Value));
                     }
-                }
-                else
-                {
-                    startDt = new DateTimeOffset(s.Value, TimeZoneInfo.Local.GetUtcOffset(s.Value));
                 }
 
                 DateTimeOffset endDt;
@@ -120,25 +105,21 @@ public class CalendarParser : ICalendarParser
                 }
                 else
                 {
-                    if (e.IsUtc)
+                    try
                     {
-                        endDt = new DateTimeOffset(e.Value, TimeSpan.Zero);
+                        var utcDt = e.AsUtc;
+                        endDt = new DateTimeOffset(utcDt, TimeSpan.Zero);
                     }
-                    else if (e.TzId != null)
+                    catch
                     {
-                        try
+                        if (e.IsUtc)
                         {
-                            var utcDt = e.AsUtc;
-                            endDt = new DateTimeOffset(utcDt, TimeSpan.Zero);
+                            endDt = new DateTimeOffset(e.Value, TimeSpan.Zero);
                         }
-                        catch
+                        else
                         {
                             endDt = new DateTimeOffset(e.Value, TimeZoneInfo.Local.GetUtcOffset(e.Value));
                         }
-                    }
-                    else
-                    {
-                        endDt = new DateTimeOffset(e.Value, TimeZoneInfo.Local.GetUtcOffset(e.Value));
                     }
                 }
 

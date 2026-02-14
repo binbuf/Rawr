@@ -23,4 +23,9 @@ public interface ICalendarRepository
     /// Retrieves the next upcoming event after the specified time.
     /// </summary>
     Task<CalendarEvent?> GetNextEventAsync(DateTimeOffset afterTime, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Clears all stored calendar events.
+    /// </summary>
+    Task ClearAllEventsAsync(CancellationToken cancellationToken = default);
 }

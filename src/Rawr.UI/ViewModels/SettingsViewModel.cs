@@ -16,15 +16,21 @@ public partial class SettingsViewModel : ObservableObject
     private readonly ISettingsManager _settingsManager;
     private readonly IVoiceService _voiceService;
     private readonly IAudioPlaybackService _audioPlaybackService;
+    private readonly IOsIntegrationService _osIntegrationService;
+    private readonly ICalendarRepository _calendarRepository;
 
     public SettingsViewModel(
         ISettingsManager settingsManager,
         IVoiceService voiceService,
-        IAudioPlaybackService audioPlaybackService)
+        IAudioPlaybackService audioPlaybackService,
+        IOsIntegrationService osIntegrationService,
+        ICalendarRepository calendarRepository)
     {
         _settingsManager = settingsManager;
         _voiceService = voiceService;
         _audioPlaybackService = audioPlaybackService;
+        _osIntegrationService = osIntegrationService;
+        _calendarRepository = calendarRepository;
         
         LoadSettings();
     }
@@ -35,6 +41,8 @@ public partial class SettingsViewModel : ObservableObject
         _settingsManager = null!;
         _voiceService = null!;
         _audioPlaybackService = null!;
+        _osIntegrationService = null!;
+        _calendarRepository = null!;
     }
 
     [ObservableProperty]
@@ -63,16 +71,15 @@ public partial class SettingsViewModel : ObservableObject
     [RelayCommand]
     private void Save()
     {
-        // Config is already a reference to _settingsManager.Settings if we assigned it correctly
-        // But to be safe, we can copy back if needed. 
-        // Assuming Config is bound to UI and updates the object.
-        
-        // _settingsManager.Settings is likely the same instance as Config.
-        // If not, we might need to copy properties.
-        // Since we did: Config = _settingsManager.Settings; in LoadSettings, it is the same reference.
-        
         Config.Calendar.Sources = CalendarSources.ToList();
         _settingsManager.Save();
+        _osIntegrationService.SetStartWithOs(Config.General.StartWithOS);
+    }
+
+    [RelayCommand]
+    private async Task ResetData()
+    {
+        await _calendarRepository.ClearAllEventsAsync();
     }
 
     [RelayCommand]

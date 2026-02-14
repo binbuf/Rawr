@@ -17,23 +17,34 @@ public class NotificationWindowManager : IDisposable
     private readonly IVoiceService _voiceService;
     private readonly IAudioPlaybackService _audioPlaybackService;
     private readonly ISettingsManager _settingsManager;
+    private readonly IOsIntegrationService _osIntegrationService;
     
     private NotificationWindow? _currentWindow;
     private CalendarEvent? _currentEvent;
+    private readonly DispatcherTimer _fullscreenCheckTimer;
 
     public NotificationWindowManager(
         NotificationQueue notificationQueue,
         IVoiceService voiceService,
         IAudioPlaybackService audioPlaybackService,
-        ISettingsManager settingsManager)
+        ISettingsManager settingsManager,
+        IOsIntegrationService osIntegrationService)
     {
         _notificationQueue = notificationQueue;
         _voiceService = voiceService;
         _audioPlaybackService = audioPlaybackService;
         _settingsManager = settingsManager;
+        _osIntegrationService = osIntegrationService;
 
         _notificationQueue.AlertAdded += OnAlertAdded;
         _notificationQueue.AlertRemoved += OnAlertRemoved;
+
+        _fullscreenCheckTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromSeconds(2)
+        };
+        _fullscreenCheckTimer.Tick += (s, e) => UpdateDisplay();
+        _fullscreenCheckTimer.Start();
     }
 
     private void OnAlertAdded(object? sender, CalendarEvent evt)
@@ -55,6 +66,13 @@ public class NotificationWindowManager : IDisposable
         var activeAlerts = _notificationQueue.GetActiveAlerts();
         
         if (activeAlerts.Count == 0)
+        {
+            CloseCurrentWindow();
+            return;
+        }
+
+        var config = _settingsManager.Settings.Notifications;
+        if (config.HideOnFullscreen && _osIntegrationService.IsFullscreen())
         {
             CloseCurrentWindow();
             return;
@@ -163,6 +181,7 @@ public class NotificationWindowManager : IDisposable
 
     public void Dispose()
     {
+        _fullscreenCheckTimer.Stop();
         _notificationQueue.AlertAdded -= OnAlertAdded;
         _notificationQueue.AlertRemoved -= OnAlertRemoved;
         CloseCurrentWindow();

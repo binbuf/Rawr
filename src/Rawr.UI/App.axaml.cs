@@ -111,11 +111,13 @@ namespace Rawr
             {
                 services.AddSingleton<IVoiceService, WindowsVoiceService>();
                 services.AddSingleton<IAudioPlaybackService, NAudioPlaybackService>();
+                services.AddSingleton<IOsIntegrationService, WindowsOsIntegrationService>();
             }
             else
             {
                 services.AddSingleton<IVoiceService, DummyVoiceService>();
                 services.AddSingleton<IAudioPlaybackService, DummyPlaybackService>();
+                services.AddSingleton<IOsIntegrationService, DummyOsIntegrationService>();
             }
 
             services.AddTransient<DashboardViewModel>();
@@ -332,6 +334,7 @@ namespace Rawr
         private void SimulateIntervalAlert(int minutes)
         {
             var timeAwareness = Services?.GetRequiredService<ITimeAwarenessService>();
+            var scheduler = Services?.GetRequiredService<IAlertScheduler>();
             if (timeAwareness == null) return;
 
             var now = DateTimeOffset.Now;
@@ -339,15 +342,24 @@ namespace Rawr
             var minutesUntilNext = minutes - (currentMinute % minutes);
             var next = now.AddMinutes(minutesUntilNext);
             
-            // If we are exactly at the marker (e.g. 10:30:00), we probably want THIS marker if called from debug,
-            // or maybe the NEXT one. Let's assume the user wants to hear the marker they just passed or are at.
-            // But usually next interval is in the future.
-            
             next = new DateTimeOffset(next.Year, next.Month, next.Day, next.Hour, next.Minute, 0, now.Offset);
             
-            // For simulation, we want it to trigger. TriggerTimeAnnouncementManual takes a simulatedTime
-            // and uses it for the speech.
+            // Audio announcement
             _ = timeAwareness.TriggerTimeAnnouncementManual(next);
+
+            // Visual notification (Meeting Alert)
+            if (scheduler != null)
+            {
+                var dummyEvent = new CalendarEvent
+                {
+                    Uid = $"interval_{next.Ticks}",
+                    Title = $"Time Marker: {next:t}",
+                    Start = next,
+                    End = next.AddMinutes(1),
+                    Description = $"Triggered {minutes} minute interval marker."
+                };
+                scheduler.TriggerAlertManual(dummyEvent);
+            }
         }
     }
 }

@@ -132,4 +132,22 @@ public class CalendarRepository : ICalendarRepository
             _semaphore.Release();
         }
     }
+
+    public async Task ClearAllEventsAsync(CancellationToken cancellationToken = default)
+    {
+        await _semaphore.WaitAsync(cancellationToken);
+        try
+        {
+            _eventsBySource.Clear();
+            if (File.Exists(_storagePath))
+            {
+                File.Delete(_storagePath);
+            }
+            _logger.LogInformation("All calendar events have been cleared.");
+        }
+        finally
+        {
+            _semaphore.Release();
+        }
+    }
 }
