@@ -25,6 +25,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <AvaloniaResource Include="Assets\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Rawr.Core\Rawr.Core.csproj" />
     <ProjectReference Include="..\Rawr.Infrastructure\Rawr.Infrastructure.csproj" />
   </ItemGroup>

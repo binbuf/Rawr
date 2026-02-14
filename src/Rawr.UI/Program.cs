@@ -1,5 +1,6 @@
 ﻿using Avalonia;
 using System;
+using System.Threading;
 using Serilog;
 using Serilog.Events;
 using Rawr.Infrastructure.Configuration;
@@ -8,12 +9,21 @@ namespace Rawr
 {
     internal class Program
     {
+        private const string MutexName = "Rawr-SingleInstance-Mutex";
+
         // Initialization code. Don't use any Avalonia, third-party APIs or any
         // SynchronizationContext-reliant code before AppMain is called: things aren't initialized
         // yet and stuff might break.
         [STAThread]
         public static void Main(string[] args) 
         {
+            using var mutex = new Mutex(true, MutexName, out var createdNew);
+            if (!createdNew)
+            {
+                // App is already running.
+                return;
+            }
+
             // Early initialization of settings to get log level
             var settingsManager = new SettingsManager();
             var config = settingsManager.Settings;
