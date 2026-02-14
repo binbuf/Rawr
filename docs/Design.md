@@ -9,6 +9,7 @@
 - **DI Container:** `Microsoft.Extensions.DependencyInjection`
 - **ICS Parsing:** `Ical.Net` (Standard library for iCalendar handling)
 - **Storage:** JSON (System.Text.Json) for settings and event caching.
+- **Logging:** Serilog (Rolling file sink, configurable).
 - **Concurrency:** `System.Threading.Channels` or `SemaphoreSlim` for safe repository access.
 - **Voice Synthesis:** Native OS API Abstraction (`IVoiceService`)
   - **Windows:** Hybrid `Windows.Media.SpeechSynthesis` (WinRT) with `System.Speech` (SAPI) fallback.
@@ -22,7 +23,7 @@
 - **Core Services:**
   - `CalendarRepository`: **(Singleton)** Thread-safe in-memory store for events. Handles loading/saving to JSON.
   - `IOsIntegrationService`: Abstraction for OS-specific tasks (Start on Boot, Fullscreen detection, File Paths).
-  - `CalendarSyncService`: Background service that fetches/parses `.ics` files and updates the `CalendarRepository`.
+  - `CalendarSyncService`: Background service that fetches `.ics` streams (Local/Remote, Auth support), parses them, and updates the `CalendarRepository`.
   - `AlertScheduler`: **(Singleton)** Manages the "Next Alert" logic. Handles system sleep/wake resilience.
   - `VoiceService`: Provides platform-specific TTS.
   - `SettingsManager`: Handles persistence of user configuration.
@@ -37,7 +38,7 @@
 1. **Sync:** `CalendarSyncService` fetches data -> parses via `Ical.Net` -> updates `CalendarRepository`.
 2. **Persistence:** `CalendarRepository` flushes changes to `events.json`.
 3. **Scheduling:** `AlertScheduler` calculates time to next event.
-   - **Resilience:** Uses `SystemEvents` (Win) + `PeriodicTimer` (Heartbeat, 30s) to detect system sleep/wake time jumps.
+   - **Resilience:** Uses `SystemEvents.PowerModeChanged` (Win/Linux/Mac abstractions) and a `PeriodicTimer` (Heartbeat, 30s) to detect sleep/wake cycles.
 4. **Trigger:** `AlertScheduler` wakes up -> pushes alert to `NotificationQueue`.
    - **Filter:** If event is older than `MissedEventThreshold` (default 60m), it is logged and skipped.
 
@@ -48,6 +49,14 @@ Storage locations follow platform standards:
 - **Linux:**
   - Config: `$XDG_CONFIG_HOME/rawr` (default `~/.config/rawr`)
   - Data: `$XDG_DATA_HOME/rawr` (default `~/.local/share/rawr`)
+
+### 3.4 Diagnostics & Logging
+- **Library:** Serilog
+- **Configuration:**
+  - **Level:** User-configurable (Debug/Info/Warning/Error). Default: Information.
+  - **Output:** Rolling file strategy (e.g., `logs/rawr-.log`), kept for 7 days.
+  - **Location:** Subdirectory in the platform-specific data folder (e.g., `%APPDATA%\Rawr\Logs`).
+- **Context:** Logs should include the component source (e.g., `[CalendarSyncService]`) to trace silent failures in background tasks.
 
 ## 4. Implementation Details
 
@@ -89,11 +98,30 @@ The scheduler cannot rely solely on `Task.Delay`.
     "MissedEventThresholdMinutes": 60,
     "HeartbeatIntervalSeconds": 30
   },
+  "Calendar": {
+    "Sources": [
+      {
+        "Id": "guid-1",
+        "Name": "Personal",
+        "Uri": "https://calendar.google.com/...",
+        "Type": "Remote", // Remote, Local
+        "AuthType": "None", // None, Basic, Bearer
+        "AuthToken": "", // Encrypted or stored securely if possible
+        "Color": "#FF0000",
+        "Enabled": true
+      }
+    ],
+    "SyncIntervalMinutes": 15
+  },
   "Voice": {
     "Engine": "Auto",  // Auto, WinRT, SAPI, Embedded
     "VoiceId": "Default",
     "Rate": 1.0,
     "Volume": 100
+  },
+  "Logging": {
+    "Level": "Information",
+    "RetentionDays": 7
   },
   "Linux": {
     "ForceCustomWindow": false, // If false, uses libnotify on Wayland
