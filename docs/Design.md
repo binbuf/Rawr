@@ -26,11 +26,13 @@
   - `VoiceService`: Provides platform-specific TTS.
   - `SettingsManager`: Handles persistence of user configuration.
 - **UI Windows:**
+  - `DashboardWindow`: Main interface showing upcoming events and status.
   - `SettingsWindow`: Tabbed interface for configuration.
   - `NotificationPopup`: A lightweight, borderless window. Configured as `ShowActivated = false` to prevent focus stealing.
 
 ### 3.2 Data Flow
 1. **Sync:** `CalendarSyncService` fetches data -> parses via `Ical.Net` -> updates `CalendarRepository` (write lock).
+   - *On Failure:* Emits failure event -> Updates `SettingsManager` status -> Triggers Error Popup.
 2. **Persistence:** `CalendarRepository` flushes changes to `events.json` asynchronously.
 3. **Scheduling:** `AlertScheduler` queries `CalendarRepository` (read lock) for the next upcoming event.
 4. **Trigger:** `AlertScheduler` wakes up -> invokes `NotificationPopup` & `VoiceService` -> updates `TrayIcon` animation.
@@ -44,7 +46,7 @@
     "StartWithOS": true,
     "LogLevel": "Information",
     "PopupDurationSeconds": 10,
-    "DefaultSnoozeMinutes": 60,
+    "DefaultSnoozeMinutes": 10,
     "SkipVisualOnFullscreen": true,
     "TrayAnimationIntervalMs": 300,
     "TrayAnimationDurationMs": 5000
@@ -78,36 +80,53 @@
 ## 5. Implementation Details
 
 ### 5.1 Application Lifecycle
-- **Single Instance:** `Program.cs` must use a `Mutex` or `NamedPipe` to ensure only one instance runs. If a second instance starts, it should focus the existing instance's settings window (if open) or exit.
+- **Single Instance:** `Program.cs` must use a `Mutex` or `NamedPipe`.
 - **Startup:**
   1. Load Settings & Repository.
   2. Initialize Tray Icon.
   3. Start `CalendarSyncService` and `AlertScheduler`.
-  4. Hide Main Window.
+  4. Application runs in background (Tray only initially).
+- **Tray Icon Interactions:**
+  - **Left Click:** Opens `DashboardWindow` (Upcoming Events).
+  - **Right Click:** Opens Context Menu (`Settings`, `Sync Now`, `Exit`).
 
 ### 5.2 OS Integration (`IOsIntegrationService`)
 - **Start With OS:**
   - **Windows:** Registry `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`
-  - **macOS:** `LaunchAgent` (.plist in `~/Library/LaunchAgents`)
+  - **macOS:** `LaunchAgent` (.plist)
   - **Linux:** `.desktop` file in `~/.config/autostart`
 - **Fullscreen Detection:**
   - **Windows:** `GetForegroundWindow` + `GetWindowRect` user32.dll calls.
-  - **macOS/Linux:** Likely requires specific platform APIs or shell commands (e.g., `xprop` on X11).
 
 ### 5.3 Alert Logic
-- **Dynamic Scheduling:**
-  - Calculate `nextAlertTime` based on `CalendarRepository` events and `IntervalMinutes`.
-  - Sleep/Delay until `nextAlertTime`.
-  - Listen for "ConfigurationChanged" or "EventsUpdated" events to recalculate/wake up early.
+- **Dynamic Scheduling:** Sleep/Delay until `nextAlertTime`.
 - **Missed Alerts:**
-  - Upon wake (e.g., from sleep mode), check for missed alerts.
-  - **Policy:** If an alert is > 15 minutes old, log it but do not notify. If < 15 minutes, trigger immediately.
+  - Upon wake, if alert > 15 mins old, log only.
+  - If < 15 mins, trigger immediately.
 
-### 5.4 Popup Notification
+### 5.4 Popup Notification (UI/UX)
 - **Window Properties:** `Topmost=true`, `SystemDecorations=None`, `ShowInTaskbar=false`.
-- **Focus:** CRITICAL: Must use `ShowActivated = false` (Win32 `SW_SHOWNOACTIVATE`) to avoid stealing keyboard focus from the user.
+- **Focus:** CRITICAL: Must use `ShowActivated = false` (Win32 `SW_SHOWNOACTIVATE`).
+- **Interaction:**
+  - **Snooze Button:** Dismisses popup, reschedules alert for `DefaultSnoozeMinutes` later. Closes window immediately.
+  - **Dismiss Button:** Marks alert as handled. Closes window immediately.
+  - **Content:** Event Title, Time remaining/Time of event, Source Calendar name.
 
-### 5.5 Voice Synthesis Abstraction
+### 5.5 Dashboard View (New)
+- **Purpose:** Provide a quick overview of the day without digging into settings.
+- **UI Elements:**
+  - List of upcoming events for the day (sorted chronologically).
+  - "Sync Now" button.
+  - "Settings" button (link to SettingsWindow).
+  - Visual indicator of current status (e.g., "Next alert in 15 mins").
+
+### 5.6 Error Handling & Visibility
+- **Sync Failures:**
+  - **Immediate:** Trigger a specific "Sync Failed" popup notification (distinct style from event alerts).
+  - **Persistent:** Update `Calendar` tab in `SettingsWindow` to show "Last Sync Attempt: [Timestamp]" and "Status: Failed ([Reason])".
+  - **Retry:** Background service should employ exponential backoff.
+
+### 5.7 Voice Synthesis Abstraction
 ```csharp
 public interface IVoiceService {
     Task SpeakAsync(string text, VoiceSettings settings);
@@ -118,7 +137,7 @@ public interface IVoiceService {
 ## 6. Challenges & Solutions
 - **Focus Stealing:** Solved by platform-specific window flags (`ShowActivated=false`).
 - **Cross-platform TTS:** Implement platform-specific backends for `IVoiceService`.
-- **Sync Rotation:** `CalendarSyncService` will purge events older than 1 day and only cache up to 7 days forward to keep the JSON footprint small.
+- **Sync Rotation:** `CalendarSyncService` will purge events older than 1 day and only cache up to 7 days forward.
 
 ## 7. Future Considerations
 - Support for multiple schedules.
