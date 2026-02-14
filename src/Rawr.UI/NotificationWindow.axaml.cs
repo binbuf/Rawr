@@ -4,22 +4,27 @@ using Avalonia.Markup.Xaml;
 using Rawr.ViewModels;
 using System;
 using Avalonia.Media;
+using Rawr.Core.Configuration;
 
 namespace Rawr;
 
 public partial class NotificationWindow : Window
 {
+    private readonly NotificationConfig _config;
+
     public NotificationWindow()
     {
         InitializeComponent();
+        _config = new NotificationConfig(); // Default for preview/designer
 #if DEBUG
         this.AttachDevTools();
 #endif
     }
 
-    public NotificationWindow(NotificationViewModel viewModel) : this()
+    public NotificationWindow(NotificationViewModel viewModel, NotificationConfig config) : this()
     {
         DataContext = viewModel;
+        _config = config;
     }
 
     private void InitializeComponent()
@@ -35,20 +40,41 @@ public partial class NotificationWindow : Window
 
     private void PositionWindow()
     {
-        // Simple positioning logic for bottom-right corner of primary screen
         if (Screens.Primary != null)
         {
             var screen = Screens.Primary;
             var workArea = screen.WorkingArea;
             
-            // 10px padding from edges
-            var x = workArea.Width - this.Width - 10;
-            var y = workArea.Height - this.Height - 10;
-            
-            // Adjust for screen position
-            x += workArea.X;
-            y += workArea.Y;
+            double scaling = screen.Scaling;
+            double padding = 10 * scaling;
 
+            // Use the desired width/height if available, otherwise use defaults
+            double windowWidth = (double.IsNaN(this.Width) ? 300 : this.Width) * scaling;
+            double windowHeight = (double.IsNaN(this.Height) ? 150 : this.Height) * scaling;
+
+            double x = 0;
+            double y = 0;
+
+            switch (_config.Position)
+            {
+                case PopupPosition.BottomRight:
+                    x = workArea.X + workArea.Width - windowWidth - padding;
+                    y = workArea.Y + workArea.Height - windowHeight - padding;
+                    break;
+                case PopupPosition.TopRight:
+                    x = workArea.X + workArea.Width - windowWidth - padding;
+                    y = workArea.Y + padding;
+                    break;
+                case PopupPosition.TopLeft:
+                    x = workArea.X + padding;
+                    y = workArea.Y + padding;
+                    break;
+                case PopupPosition.BottomLeft:
+                    x = workArea.X + padding;
+                    y = workArea.Y + workArea.Height - windowHeight - padding;
+                    break;
+            }
+            
             Position = new PixelPoint((int)x, (int)y);
         }
     }

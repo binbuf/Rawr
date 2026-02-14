@@ -46,6 +46,9 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private ObservableCollection<string> _availableVoices = new();
 
+    [ObservableProperty]
+    private ObservableCollection<PopupPosition> _availablePopupPositions = new(Enum.GetValues<PopupPosition>());
+
     private void LoadSettings()
     {
         if (_settingsManager == null) return;

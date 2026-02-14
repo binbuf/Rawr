@@ -128,7 +128,9 @@ public class CalendarParser : ICalendarParser
                     Start = startDt,
                     End = endDt,
                     IsAllDay = evt.IsAllDay,
-                    SourceId = source.Id
+                    SourceId = source.Id,
+                    OriginalStartTime = s.Value,
+                    OriginalTimeZoneId = s.TzId
                 });
              }
         }

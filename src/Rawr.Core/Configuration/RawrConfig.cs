@@ -4,10 +4,21 @@ using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace Rawr.Core.Configuration;
 
+public enum PopupPosition
+{
+    BottomRight,
+    TopRight,
+    TopLeft,
+    BottomLeft
+}
+
 public partial class RawrConfig : ObservableObject
 {
     [ObservableProperty]
     private GeneralConfig _general = new();
+
+    [ObservableProperty]
+    private NotificationConfig _notifications = new();
 
     [ObservableProperty]
     private TimeAwarenessConfig _timeAwareness = new();
@@ -35,6 +46,15 @@ public partial class GeneralConfig : ObservableObject
 
     [ObservableProperty]
     private int _heartbeatIntervalSeconds = 30;
+}
+
+public partial class NotificationConfig : ObservableObject
+{
+    [ObservableProperty]
+    private PopupPosition _position = PopupPosition.BottomRight;
+
+    [ObservableProperty]
+    private int _durationSeconds = 10;
 }
 
 public partial class TimeAwarenessConfig : ObservableObject

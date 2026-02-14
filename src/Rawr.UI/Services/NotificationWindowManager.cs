@@ -82,8 +82,9 @@ public class NotificationWindowManager : IDisposable
     private void ShowAlert(CalendarEvent evt)
     {
         _currentEvent = evt;
+        var config = _settingsManager.Settings.Notifications;
         var vm = new NotificationViewModel(evt, _notificationQueue);
-        _currentWindow = new NotificationWindow(vm);
+        _currentWindow = new NotificationWindow(vm, config);
         _currentWindow.Closed += (s, e) => 
         {
             // If window closed manually (e.g. Alt+F4), ensure it's dismissed from queue
@@ -94,6 +95,21 @@ public class NotificationWindowManager : IDisposable
              _currentEvent = null;
         };
         _currentWindow.Show();
+
+        // Auto-hide logic
+        if (config.DurationSeconds > 0)
+        {
+            Task.Delay(TimeSpan.FromSeconds(config.DurationSeconds)).ContinueWith(_ =>
+            {
+                Dispatcher.UIThread.Post(() =>
+                {
+                    if (_currentWindow != null && _currentEvent == evt)
+                    {
+                        _notificationQueue.Dismiss(evt);
+                    }
+                });
+            });
+        }
     }
 
     private void CloseCurrentWindow()
