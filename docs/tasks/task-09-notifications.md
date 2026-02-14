@@ -17,6 +17,7 @@ Implement the actual user-facing alerts (Popups) and the periodic Chime.
 
 3.  **Connect Scheduler to Notification**:
     *   Update `AlertScheduler` to push to `NotificationQueue` and call `IVoiceService` when an event triggers.
+    *   **Tray Integration**: When an alert is active (in queue/displayed), notify the `TrayIconService` to enter the "Alerting" state. Revert to previous state when dismissed.
 
 ## Testing
 *   **Manual**: Set an event 1 minute out. Wait. Verify Popup appears and Audio plays.

@@ -107,6 +107,18 @@ The scheduler cannot rely solely on `Task.Delay`.
   3. Also enumerate `System.Speech` (SAPI) "Legacy" voices.
   4. **Settings UI:** User selects Voice ID and Output Device.
 
+### 4.4 Tray Icon Strategy
+The tray icon provides visual feedback for background operations and alerts.
+- **Assets:**
+  - `dinosaur.ico` (Default/Idle)
+  - `calendar.ico` (Syncing)
+  - `alert.ico` (Active Alert)
+- **Behavior:**
+  - **Idle:** Static `dinosaur.ico`.
+  - **Syncing:** Alternates between `dinosaur.ico` and `calendar.ico` (approx. 500ms interval).
+  - **Alerting:** Alternates between `dinosaur.ico` and `alert.ico` (approx. 500ms interval).
+- **Priority:** **Alerting** > **Syncing** > **Idle**. If an alert triggers while syncing, the Alert animation takes precedence.
+
 ## 5. Data Models (Updated)
 
 ### 5.1 Configuration (JSON)

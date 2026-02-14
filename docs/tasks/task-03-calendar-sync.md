@@ -16,6 +16,7 @@ Implement the ability to fetch and parse iCalendar (.ics) feeds.
 
 3.  **Sync Service** (`Rawr.Infrastructure`):
     *   Create `ICalendarSyncService`.
+    *   **State Notification**: Expose an event `event Action<bool> IsSyncingChanged` or standard `INotifyPropertyChanged` so the UI (Tray Icon) knows when to start/stop the animation.
     *   Implement logic to fetch `.ics` content from HTTP/HTTPS URLs (using `HttpClient`).
     *   Handle "PrivateUrl" auth (token in URL) and "Basic" auth (if needed later, scaffolding for now).
     *   Use `Polly` for retry logic on HTTP requests (Exponential backoff).
