@@ -12,6 +12,7 @@ public class SettingsManager : ISettingsManager
     private readonly string _appDataPath;
 
     public RawrConfig Settings { get; private set; } = new();
+    public string AppDataPath => _appDataPath;
 
     public SettingsManager(string? basePath = null)
     {

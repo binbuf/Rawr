@@ -4,8 +4,11 @@ using Avalonia.Markup.Xaml;
 using Microsoft.Extensions.DependencyInjection;
 using Rawr.Core.Interfaces;
 using Rawr.Infrastructure.Configuration;
+using Rawr.Infrastructure.Persistence;
+using Rawr.Infrastructure.Services;
 using Serilog;
 using System;
+using System.Net.Http;
 
 namespace Rawr
 {
@@ -37,6 +40,12 @@ namespace Rawr
         {
             services.AddSingleton<ISettingsManager, SettingsManager>();
             services.AddLogging(logging => logging.AddSerilog());
+
+            services.AddSingleton(TimeProvider.System);
+            services.AddSingleton<HttpClient>();
+            services.AddSingleton<ICalendarParser, CalendarParser>();
+            services.AddSingleton<ICalendarRepository, CalendarRepository>();
+            services.AddSingleton<ICalendarSyncService, CalendarSyncService>();
         }
     }
 }

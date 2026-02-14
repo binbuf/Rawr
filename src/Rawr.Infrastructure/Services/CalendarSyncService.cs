@@ -16,6 +16,7 @@ public class CalendarSyncService : ICalendarSyncService
 {
     private readonly ISettingsManager _settingsManager;
     private readonly ICalendarParser _parser;
+    private readonly ICalendarRepository _repository;
     private readonly HttpClient _httpClient;
     private readonly ILogger<CalendarSyncService> _logger;
     private readonly ResiliencePipeline _resiliencePipeline;
@@ -25,11 +26,13 @@ public class CalendarSyncService : ICalendarSyncService
     public CalendarSyncService(
         ISettingsManager settingsManager,
         ICalendarParser parser,
+        ICalendarRepository repository,
         HttpClient httpClient,
         ILogger<CalendarSyncService> logger)
     {
         _settingsManager = settingsManager;
         _parser = parser;
+        _repository = repository;
         _httpClient = httpClient;
         _logger = logger;
 
@@ -66,7 +69,10 @@ public class CalendarSyncService : ICalendarSyncService
                 try
                 {
                     var events = await SyncSourceAsync(source, lookAhead, cancellationToken);
-                    allEvents.AddRange(events);
+                    var eventList = events as List<CalendarEvent> ?? new List<CalendarEvent>(events);
+                    
+                    await _repository.SaveEventsAsync(source.Id, eventList, cancellationToken);
+                    allEvents.AddRange(eventList);
                 }
                 catch (Exception ex)
                 {
