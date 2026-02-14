@@ -301,7 +301,8 @@ namespace Rawr
 
                         foreach (var evt in evts)
                         {
-                            var evtItem = new NativeMenuItem($"{evt.Start.ToLocalTime():t} - {evt.Title}");
+                            var localStart = evt.Start.ToLocalTime();
+                            var evtItem = new NativeMenuItem($"{localStart:t} - {evt.Title}");
                             evtItem.Click += (s2, e2) => {
                                 var scheduler = Services?.GetRequiredService<IAlertScheduler>();
                                 scheduler?.TriggerAlertManual(evt);
@@ -337,8 +338,15 @@ namespace Rawr
             var currentMinute = now.Minute;
             var minutesUntilNext = minutes - (currentMinute % minutes);
             var next = now.AddMinutes(minutesUntilNext);
-            next = new DateTimeOffset(next.Year, next.Month, next.Day, next.Hour, next.Minute, 0, next.Offset);
             
+            // If we are exactly at the marker (e.g. 10:30:00), we probably want THIS marker if called from debug,
+            // or maybe the NEXT one. Let's assume the user wants to hear the marker they just passed or are at.
+            // But usually next interval is in the future.
+            
+            next = new DateTimeOffset(next.Year, next.Month, next.Day, next.Hour, next.Minute, 0, now.Offset);
+            
+            // For simulation, we want it to trigger. TriggerTimeAnnouncementManual takes a simulatedTime
+            // and uses it for the speech.
             _ = timeAwareness.TriggerTimeAnnouncementManual(next);
         }
     }
