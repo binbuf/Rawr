@@ -41,6 +41,18 @@ namespace Rawr
                 trayService.Initialize(trayIcons[0]);
             }
 
+            // Start Background Services
+            var alertScheduler = Services.GetRequiredService<IAlertScheduler>();
+            var timeAwareness = Services.GetRequiredService<ITimeAwarenessService>();
+            var periodicSync = Services.GetRequiredService<PeriodicSyncService>();
+            
+            // Just resolve to instantiate and hook events
+            Services.GetRequiredService<NotificationWindowManager>();
+
+            _ = alertScheduler.StartAsync(CancellationToken.None);
+            _ = timeAwareness.StartAsync(CancellationToken.None);
+            _ = periodicSync.StartAsync(CancellationToken.None);
+
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
                 var dashboardVm = Services.GetRequiredService<DashboardViewModel>();
@@ -65,7 +77,10 @@ namespace Rawr
             services.AddSingleton<ICalendarRepository, CalendarRepository>();
             services.AddSingleton<ICalendarSyncService, CalendarSyncService>();
             services.AddSingleton<IAlertScheduler, AlertScheduler>();
+            services.AddSingleton<ITimeAwarenessService, TimeAwarenessService>();
+            services.AddSingleton<PeriodicSyncService>();
             services.AddSingleton<NotificationQueue>();
+            services.AddSingleton<NotificationWindowManager>();
             services.AddSingleton<TrayIconService>();
 
             if (OperatingSystem.IsWindows())
