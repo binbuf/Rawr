@@ -1,3 +1,7 @@
 <Solution>
-  <Project Path="Rawr.csproj" />
+  <Project Path="src\Rawr.UI\Rawr.UI.csproj" />
+  <Project Path="src\Rawr.Core\Rawr.Core.csproj" />
+  <Project Path="src\Rawr.Infrastructure\Rawr.Infrastructure.csproj" />
+  <Project Path="tests\Rawr.Core.Tests\Rawr.Core.Tests.csproj" />
+  <Project Path="tests\Rawr.Infrastructure.Tests\Rawr.Infrastructure.Tests.csproj" />
 </Solution>

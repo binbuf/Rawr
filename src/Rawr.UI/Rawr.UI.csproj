@@ -18,4 +18,9 @@
       <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
     </PackageReference>
   </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Rawr.Core\Rawr.Core.csproj" />
+    <ProjectReference Include="..\Rawr.Infrastructure\Rawr.Infrastructure.csproj" />
+  </ItemGroup>
 </Project>
