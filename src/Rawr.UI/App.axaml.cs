@@ -48,6 +48,17 @@ namespace Rawr
             services.AddSingleton<ICalendarRepository, CalendarRepository>();
             services.AddSingleton<ICalendarSyncService, CalendarSyncService>();
             services.AddSingleton<IAlertScheduler, AlertScheduler>();
+
+            if (OperatingSystem.IsWindows())
+            {
+                services.AddSingleton<IVoiceService, WindowsVoiceService>();
+                services.AddSingleton<IAudioPlaybackService, NAudioPlaybackService>();
+            }
+            else
+            {
+                services.AddSingleton<IVoiceService, DummyVoiceService>();
+                services.AddSingleton<IAudioPlaybackService, DummyPlaybackService>();
+            }
         }
     }
 }
