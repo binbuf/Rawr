@@ -11,6 +11,7 @@
 - **Storage:** JSON (System.Text.Json) for settings and event caching.
 - **Logging:** Serilog (Rolling file sink, configurable).
 - **Concurrency:** `System.Threading.Channels` or `SemaphoreSlim` for safe repository access.
+- **Resilience:** Polly (Retry policies, Circuit Breakers).
 - **Voice Synthesis:** Native OS API Abstraction (`IVoiceService`)
   - **Windows:** Hybrid `Windows.Media.SpeechSynthesis` (WinRT) with `System.Speech` (SAPI) fallback.
   - **macOS:** `NSSpeechSynthesizer` (via interop)
@@ -41,6 +42,9 @@
    - **Resilience:** Uses `SystemEvents.PowerModeChanged` (Win/Linux/Mac abstractions) and a `PeriodicTimer` (Heartbeat, 30s) to detect sleep/wake cycles.
 4. **Trigger:** `AlertScheduler` wakes up -> pushes alert to `NotificationQueue`.
    - **Filter:** If event is older than `MissedEventThreshold` (default 60m), it is logged and skipped.
+5. **Resilience:**
+   - **Sync Failure:** Uses exponential backoff (Polly).
+   - **Feedback:** If sync fails > 3 times, tray icon updates to a "Warning" state to notify the user of connectivity/auth issues. Application operates on last known cached `events.json`.
 
 ### 3.3 File System & Paths
 Storage locations follow platform standards:
@@ -71,10 +75,13 @@ The scheduler cannot rely solely on `Task.Delay`.
   - If `Now > EventTime + Config.MissedEventThresholdMinutes` (default 60), the event is **Discarded** (silent log).
   - If `Now <= EventTime + Threshold`, the event fires **Immediately** (catch-up).
 
-### 4.2 Linux Strategy (Wayland First)
+### 4.2 Linux Strategy (Compatibility First)
 - **Visual Alerts:**
-  - **Primary:** `org.freedesktop.Notifications` (DBus). This ensures integration with GNOME/KDE/Sway "Do Not Disturb" modes and prevents window positioning issues on Wayland.
-  - **Fallback:** Custom `NotificationPopup` (only if X11 session detected or user forces "Custom Window" mode).
+  - **Goal:** Guarantee visibility and interaction on as many desktops as possible.
+  - **Primary (X11):** Custom `NotificationPopup` window. Allows for precise positioning and "Snooze/Dismiss" buttons.
+  - **Fallback (Wayland):** `libnotify` (org.freedesktop.Notifications).
+    - *Reasoning:* Custom windows cannot be reliably positioned on Wayland (security restriction). `libnotify` ensures the alert is seen, handled by the OS notification center.
+    - *Interaction:* Basic information only.
 - **Fullscreen Detection:**
   - **X11:** `_NET_ACTIVE_WINDOW` atom checks.
   - **Wayland:** No standard protocol for "active window is fullscreen". Feature will be "Best Effort" or disabled on Wayland unless specific compositor protocols (like Hyprland IPC) are supported.
@@ -106,7 +113,7 @@ The scheduler cannot rely solely on `Task.Delay`.
         "Uri": "https://calendar.google.com/...",
         "Type": "Remote", // Remote, Local
         "AuthType": "None", // None, Basic, Bearer
-        "AuthToken": "", // Encrypted or stored securely if possible
+        "AuthToken": "", // Stored in plain text for MVP (User warning required)
         "Color": "#FF0000",
         "Enabled": true
       }
