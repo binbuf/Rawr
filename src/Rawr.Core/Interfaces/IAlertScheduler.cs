@@ -21,4 +21,14 @@ public interface IAlertScheduler
     /// Event triggered when an alert should be shown.
     /// </summary>
     event EventHandler<CalendarEvent> AlertTriggered;
+
+    /// <summary>
+    /// Gets or sets the time until which alerts are snoozed.
+    /// </summary>
+    DateTimeOffset? SnoozeUntil { get; set; }
+
+    /// <summary>
+    /// Manually triggers an alert for the specified event.
+    /// </summary>
+    void TriggerAlertManual(CalendarEvent evt);
 }

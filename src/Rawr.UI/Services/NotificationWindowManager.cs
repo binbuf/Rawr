@@ -111,6 +111,11 @@ public class NotificationWindowManager : IDisposable
         try
         {
             var voiceSettings = _settingsManager.Settings.Voice;
+            if (voiceSettings.Muted)
+            {
+                return;
+            }
+
             string text = $"Reminder: {evt.Title}.";
             
             // If time is now or very close, say "Now".

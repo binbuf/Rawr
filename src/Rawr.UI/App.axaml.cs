@@ -8,12 +8,17 @@ using Rawr.Infrastructure.Configuration;
 using Rawr.Infrastructure.Persistence;
 using Rawr.Infrastructure.Services;
 using Rawr.Core.Services;
+using Rawr.Core.Models;
 using Rawr.Services;
 using Rawr.ViewModels;
 using Serilog;
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
 using System.Threading;
+using System.Threading.Tasks;
+using Avalonia.Threading;
 
 namespace Rawr
 {
@@ -44,29 +49,10 @@ namespace Rawr
                     ToolTipText = "Rawr",
                     IsVisible = true,
                 };
+                trayIcon.Clicked += (s, e) => OnDashboardClick(s, e);
                 
                 // Create Menu
-                var menu = new NativeMenu();
-                
-                var dashboardItem = new NativeMenuItem("Dashboard");
-                dashboardItem.Click += OnDashboardClick;
-                menu.Items.Add(dashboardItem);
-
-                var syncItem = new NativeMenuItem("Sync Now");
-                syncItem.Click += OnSyncNowClick;
-                menu.Items.Add(syncItem);
-
-                menu.Items.Add(new NativeMenuItemSeparator());
-
-                var settingsItem = new NativeMenuItem("Settings");
-                settingsItem.Click += OnSettingsClick;
-                menu.Items.Add(settingsItem);
-
-                var exitItem = new NativeMenuItem("Exit");
-                exitItem.Click += OnExitClick;
-                menu.Items.Add(exitItem);
-
-                trayIcon.Menu = menu;
+                trayIcon.Menu = CreateTrayMenu();
 
                 // Add to application
                 var icons = TrayIcon.GetIcons(this);
@@ -180,6 +166,149 @@ namespace Rawr
                 }
                 desktop.Shutdown();
             }
+        }
+
+        private NativeMenu CreateTrayMenu()
+        {
+            var menu = new NativeMenu();
+
+            var dashboardItem = new NativeMenuItem("Dashboard");
+            dashboardItem.Click += OnDashboardClick;
+            menu.Items.Add(dashboardItem);
+
+            var syncItem = new NativeMenuItem("Sync Now");
+            syncItem.Click += OnSyncNowClick;
+            menu.Items.Add(syncItem);
+
+            menu.Items.Add(new NativeMenuItemSeparator());
+
+            // Snooze Submenu
+            var snoozeMenu = new NativeMenu();
+            var snoozeItem = new NativeMenuItem("Snooze") { Menu = snoozeMenu };
+            
+            var snoozeOptions = new (string Label, TimeSpan? Duration)[]
+            {
+                ("15 minutes", TimeSpan.FromMinutes(15)),
+                ("30 minutes", TimeSpan.FromMinutes(30)),
+                ("1 hour", TimeSpan.FromHours(1)),
+                ("2 hours", TimeSpan.FromHours(2)),
+                ("6 hours", TimeSpan.FromHours(6)),
+                ("8 hours", TimeSpan.FromHours(8)),
+                ("All day", null)
+            };
+
+            foreach (var opt in snoozeOptions)
+            {
+                var item = new NativeMenuItem(opt.Label);
+                item.Click += (s, e) => {
+                    var scheduler = Services?.GetRequiredService<IAlertScheduler>();
+                    if (scheduler != null) {
+                        if (opt.Duration.HasValue)
+                            scheduler.SnoozeUntil = DateTimeOffset.Now.Add(opt.Duration.Value);
+                        else
+                            scheduler.SnoozeUntil = DateTimeOffset.Now.Date.AddDays(1);
+                    }
+                };
+                snoozeMenu.Items.Add(item);
+            }
+            menu.Items.Add(snoozeItem);
+
+            // Mute Voice Toggle
+            var settingsManager = Services?.GetRequiredService<ISettingsManager>();
+            var muteItem = new NativeMenuItem("Mute Voice") 
+            { 
+                IsChecked = settingsManager?.Settings.Voice.Muted ?? false
+            };
+            muteItem.Click += (s, e) => {
+                if (settingsManager != null) {
+                    settingsManager.Settings.Voice.Muted = !settingsManager.Settings.Voice.Muted;
+                    settingsManager.Save();
+                    muteItem.IsChecked = settingsManager.Settings.Voice.Muted;
+                }
+            };
+            menu.Items.Add(muteItem);
+
+            menu.Items.Add(new NativeMenuItemSeparator());
+
+#if DEBUG
+            // Debug Menu
+            var debugMenu = new NativeMenu();
+            var debugItem = new NativeMenuItem("Debug") { Menu = debugMenu };
+
+            // Interval Based
+            var intervalMenu = new NativeMenu();
+            var intervalItem = new NativeMenuItem("Interval Based Alert") { Menu = intervalMenu };
+            
+            var next30 = new NativeMenuItem("Next 30 minute marker");
+            next30.Click += (s, e) => SimulateIntervalAlert(30);
+            intervalMenu.Items.Add(next30);
+            
+            var nextHour = new NativeMenuItem("Next hour");
+            nextHour.Click += (s, e) => SimulateIntervalAlert(60);
+            intervalMenu.Items.Add(nextHour);
+            
+            debugMenu.Items.Add(intervalItem);
+
+            // Event Based
+            var eventBasedMenu = new NativeMenu();
+            var eventBasedItem = new NativeMenuItem("Event Based Alert") { Menu = eventBasedMenu };
+            
+            var refreshEventsItem = new NativeMenuItem("Refresh Events List");
+            refreshEventsItem.Click += (s, e) => {
+                eventBasedMenu.Items.Clear();
+                eventBasedMenu.Items.Add(refreshEventsItem);
+                eventBasedMenu.Items.Add(new NativeMenuItemSeparator());
+                
+                Task.Run(async () => {
+                    var repo = Services?.GetRequiredService<ICalendarRepository>();
+                    if (repo == null) return;
+                    
+                    var evts = (await repo.GetAllEventsAsync(CancellationToken.None))
+                                    .OrderBy(o => o.Start)
+                                    .ToList();
+
+                    Dispatcher.UIThread.Post(() => {
+                        foreach (var evt in evts)
+                        {
+                            var evtItem = new NativeMenuItem($"{evt.Start.ToLocalTime():t} - {evt.Title}");
+                            evtItem.Click += (s2, e2) => {
+                                var scheduler = Services?.GetRequiredService<IAlertScheduler>();
+                                scheduler?.TriggerAlertManual(evt);
+                            };
+                            eventBasedMenu.Items.Add(evtItem);
+                        }
+                    });
+                });
+            };
+            eventBasedMenu.Items.Add(refreshEventsItem);
+            
+            debugMenu.Items.Add(eventBasedItem);
+            menu.Items.Add(debugItem);
+#endif
+
+            var settingsItem = new NativeMenuItem("Settings");
+            settingsItem.Click += OnSettingsClick;
+            menu.Items.Add(settingsItem);
+
+            var exitItem = new NativeMenuItem("Exit");
+            exitItem.Click += OnExitClick;
+            menu.Items.Add(exitItem);
+
+            return menu;
+        }
+
+        private void SimulateIntervalAlert(int minutes)
+        {
+            var timeAwareness = Services?.GetRequiredService<ITimeAwarenessService>();
+            if (timeAwareness == null) return;
+
+            var now = DateTimeOffset.Now;
+            var currentMinute = now.Minute;
+            var minutesUntilNext = minutes - (currentMinute % minutes);
+            var next = now.AddMinutes(minutesUntilNext);
+            next = new DateTimeOffset(next.Year, next.Month, next.Day, next.Hour, next.Minute, 0, next.Offset);
+            
+            _ = timeAwareness.TriggerTimeAnnouncementManual(next);
         }
     }
 }

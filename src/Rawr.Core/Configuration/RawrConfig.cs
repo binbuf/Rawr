@@ -52,6 +52,7 @@ public class VoiceConfig
     public string DeviceId { get; set; } = "Default";
     public double Rate { get; set; } = 1.0;
     public int Volume { get; set; } = 100;
+    public bool Muted { get; set; } = false;
 }
 
 public class LoggingConfig

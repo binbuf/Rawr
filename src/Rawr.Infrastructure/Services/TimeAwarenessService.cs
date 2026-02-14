@@ -100,7 +100,7 @@ public class TimeAwarenessService : ITimeAwarenessService, IDisposable
                 settings = _settingsManager.Settings.TimeAwareness; 
                 if (!settings.Enabled) continue;
 
-                await AnnounceTimeAsync(token);
+                await AnnounceTimeAsync(now, token);
 
                 // Wait a tiny bit to avoid double triggering if calculation was slightly off (e.g. 1ms before minute)
                 await Task.Delay(TimeSpan.FromSeconds(2), token);
@@ -115,6 +115,11 @@ public class TimeAwarenessService : ITimeAwarenessService, IDisposable
             _logger.LogError(ex, "Error in TimeAwarenessService loop.");
             try { await Task.Delay(TimeSpan.FromMinutes(1), token); } catch { }
         }
+    }
+
+    public async Task TriggerTimeAnnouncementManual(DateTimeOffset? simulatedTime = null)
+    {
+        await AnnounceTimeAsync(simulatedTime ?? _timeProvider.GetLocalNow(), CancellationToken.None);
     }
 
     private DateTimeOffset CalculateNextInterval(DateTimeOffset now, int intervalMinutes)
@@ -143,12 +148,10 @@ public class TimeAwarenessService : ITimeAwarenessService, IDisposable
         return next;
     }
 
-    private async Task AnnounceTimeAsync(CancellationToken token)
+    private async Task AnnounceTimeAsync(DateTimeOffset now, CancellationToken token)
     {
         try
         {
-            var now = _timeProvider.GetLocalNow();
-            
             // Adjust "00" minutes to o'clock if needed
             // "It is 2 PM" is better than "It is 2 00 PM"
             string speechText;
@@ -164,6 +167,12 @@ public class TimeAwarenessService : ITimeAwarenessService, IDisposable
             _logger.LogInformation("Announcing time: {SpeechText}", speechText);
 
             var voiceSettings = _settingsManager.Settings.Voice;
+            if (voiceSettings.Muted)
+            {
+                _logger.LogInformation("Voice is muted, skipping announcement.");
+                return;
+            }
+
             var voiceOptions = new VoiceOptions
             {
                 VoiceId = voiceSettings.VoiceId,

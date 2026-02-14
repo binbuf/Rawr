@@ -22,6 +22,8 @@ public class AlertScheduler : IAlertScheduler, IDisposable
 
     public event EventHandler<CalendarEvent>? AlertTriggered;
 
+    public DateTimeOffset? SnoozeUntil { get; set; }
+
     public AlertScheduler(
         ICalendarRepository repository,
         ISettingsManager settingsManager,
@@ -81,6 +83,13 @@ public class AlertScheduler : IAlertScheduler, IDisposable
 
                 // Cleanup old fired events to prevent memory leak
                 CleanupFiredEvents(now, missedThreshold);
+
+                if (SnoozeUntil.HasValue && now < SnoozeUntil.Value)
+                {
+                    // Alerts are snoozed. We still want to calculate wait time to next check.
+                    await WaitAsync(TimeSpan.FromSeconds(settings.HeartbeatIntervalSeconds), token);
+                    continue;
+                }
 
                 var events = await _repository.GetAllEventsAsync(token);
 
@@ -162,6 +171,12 @@ public class AlertScheduler : IAlertScheduler, IDisposable
     {
         _logger.LogInformation("Triggering alert for event: {Title} at {Start}", evt.Title, evt.Start);
         MarkAsFired(evt);
+        AlertTriggered?.Invoke(this, evt);
+    }
+
+    public void TriggerAlertManual(CalendarEvent evt)
+    {
+        _logger.LogInformation("Manually triggering alert for event: {Title}", evt.Title);
         AlertTriggered?.Invoke(this, evt);
     }
 
