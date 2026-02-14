@@ -5,7 +5,7 @@
 
 ## 2. Technology Stack
 - **Framework:** Avalonia UI (Cross-platform XAML)
-- **Runtime:** .NET 8.0+
+- **Runtime:** .NET 10.0
 - **ICS Parsing:** `Ical.Net` (Standard library for iCalendar handling)
 - **Storage:** JSON (System.Text.Json) for settings and event caching.
 - **Voice Synthesis:** Native OS API Abstraction (`IVoiceService`)
@@ -16,7 +16,7 @@
 ## 3. Architecture
 
 ### 3.1 Components
-- **Main Application:** Handles lifecycle and tray icon management.
+- **Main Application:** Handles lifecycle and tray icon management (including animation).
 - **Background Services:**
   - `CalendarSyncService`: Periodically fetches and parses `.ics` files (web or local). Rotates events to keep only the next few days.
   - `AlertScheduler`: Monitors time and triggers alerts based on scheduled intervals and calendar events.
@@ -29,7 +29,7 @@
 ### 3.2 Data Flow
 1. **Sync:** `CalendarSyncService` fetches data -> `Ical.Net` parses -> `SettingsManager` caches events in JSON.
 2. **Alert:** `AlertScheduler` checks current time against `Schedule` and `CachedEvents`.
-3. **Trigger:** `AlertScheduler` invokes `NotificationPopup` and `VoiceService`.
+3. **Trigger:** `AlertScheduler` invokes `NotificationPopup`, `VoiceService`, and starts `TrayIconAnimation`.
 
 ## 4. Data Models
 
@@ -41,7 +41,9 @@
     "LogLevel": "Information",
     "PopupDurationSeconds": 10,
     "DefaultSnoozeMinutes": 60,
-    "SkipVisualOnFullscreen": true
+    "SkipVisualOnFullscreen": true,
+    "TrayAnimationIntervalMs": 300,
+    "TrayAnimationDurationMs": 5000
   },
   "Schedule": {
     "Days": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
@@ -74,6 +76,7 @@
 ### 5.1 System Tray Integration
 - Use `Avalonia.Controls.TrayIcon`.
 - Menu options: `Settings`, `Snooze (Global)`, `Sync Now`, `Exit`.
+- **Animation:** When an alert triggers, the tray icon alternates between `icon1.ico` and `icon2.ico` every `TrayAnimationIntervalMs` for `TrayAnimationDurationMs`.
 - `MainWindow` will be hidden by default (`IsVisible="False"`) or used only for the Settings view.
 
 ### 5.2 Alert Logic
