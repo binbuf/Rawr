@@ -8,6 +8,7 @@
 - **Runtime:** .NET 10.0
 - **ICS Parsing:** `Ical.Net` (Standard library for iCalendar handling)
 - **Storage:** JSON (System.Text.Json) for settings and event caching.
+- **Concurrency:** `System.Threading.Channels` or `SemaphoreSlim` for safe repository access.
 - **Voice Synthesis:** Native OS API Abstraction (`IVoiceService`)
   - **Windows:** `System.Speech` or `Windows.Media.SpeechSynthesis`
   - **macOS:** `NSSpeechSynthesizer` (via interop)
@@ -16,20 +17,23 @@
 ## 3. Architecture
 
 ### 3.1 Components
-- **Main Application:** Handles lifecycle and tray icon management (including animation).
-- **Background Services:**
-  - `CalendarSyncService`: Periodically fetches and parses `.ics` files (web or local). Rotates events to keep only the next few days.
-  - `AlertScheduler`: Monitors time and triggers alerts based on scheduled intervals and calendar events.
+- **Main Application:** Handles lifecycle, single-instance check, and tray icon management.
+- **Core Services:**
+  - `CalendarRepository`: **(Singleton)** Thread-safe in-memory store for events. Handles loading/saving to JSON but serves queries from memory.
+  - `IOsIntegrationService`: Abstraction for OS-specific tasks (Start on Boot, Fullscreen detection).
+  - `CalendarSyncService`: Background service that fetches/parses `.ics` files and updates the `CalendarRepository`.
+  - `AlertScheduler`: specific "Dynamic Timer" logic (not polling). Calculates time to next alert and sleeps until then.
   - `VoiceService`: Provides platform-specific TTS.
   - `SettingsManager`: Handles persistence of user configuration.
 - **UI Windows:**
   - `SettingsWindow`: Tabbed interface for configuration.
-  - `NotificationPopup`: A lightweight, borderless window that appears for alerts.
+  - `NotificationPopup`: A lightweight, borderless window. Configured as `ShowActivated = false` to prevent focus stealing.
 
 ### 3.2 Data Flow
-1. **Sync:** `CalendarSyncService` fetches data -> `Ical.Net` parses -> `SettingsManager` caches events in JSON.
-2. **Alert:** `AlertScheduler` checks current time against `Schedule` and `CachedEvents`.
-3. **Trigger:** `AlertScheduler` invokes `NotificationPopup`, `VoiceService`, and starts `TrayIconAnimation`.
+1. **Sync:** `CalendarSyncService` fetches data -> parses via `Ical.Net` -> updates `CalendarRepository` (write lock).
+2. **Persistence:** `CalendarRepository` flushes changes to `events.json` asynchronously.
+3. **Scheduling:** `AlertScheduler` queries `CalendarRepository` (read lock) for the next upcoming event.
+4. **Trigger:** `AlertScheduler` wakes up -> invokes `NotificationPopup` & `VoiceService` -> updates `TrayIcon` animation.
 
 ## 4. Data Models
 
@@ -73,18 +77,37 @@
 
 ## 5. Implementation Details
 
-### 5.1 System Tray Integration
-- Use `Avalonia.Controls.TrayIcon`.
-- Menu options: `Settings`, `Snooze (Global)`, `Sync Now`, `Exit`.
-- **Animation:** When an alert triggers, the tray icon alternates between `icon1.ico` and `icon2.ico` every `TrayAnimationIntervalMs` for `TrayAnimationDurationMs`.
-- `MainWindow` will be hidden by default (`IsVisible="False"`) or used only for the Settings view.
+### 5.1 Application Lifecycle
+- **Single Instance:** `Program.cs` must use a `Mutex` or `NamedPipe` to ensure only one instance runs. If a second instance starts, it should focus the existing instance's settings window (if open) or exit.
+- **Startup:**
+  1. Load Settings & Repository.
+  2. Initialize Tray Icon.
+  3. Start `CalendarSyncService` and `AlertScheduler`.
+  4. Hide Main Window.
 
-### 5.2 Alert Logic
-- **Interval Alerts:** Triggered every `n` minutes within the `Start` and `End` time window on selected `Days`.
-- **Calendar Alerts:** Triggered `m` minutes before an event starts.
-- **Logic:** A 1-second timer checks the next scheduled alert.
+### 5.2 OS Integration (`IOsIntegrationService`)
+- **Start With OS:**
+  - **Windows:** Registry `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`
+  - **macOS:** `LaunchAgent` (.plist in `~/Library/LaunchAgents`)
+  - **Linux:** `.desktop` file in `~/.config/autostart`
+- **Fullscreen Detection:**
+  - **Windows:** `GetForegroundWindow` + `GetWindowRect` user32.dll calls.
+  - **macOS/Linux:** Likely requires specific platform APIs or shell commands (e.g., `xprop` on X11).
 
-### 5.3 Voice Synthesis Abstraction
+### 5.3 Alert Logic
+- **Dynamic Scheduling:**
+  - Calculate `nextAlertTime` based on `CalendarRepository` events and `IntervalMinutes`.
+  - Sleep/Delay until `nextAlertTime`.
+  - Listen for "ConfigurationChanged" or "EventsUpdated" events to recalculate/wake up early.
+- **Missed Alerts:**
+  - Upon wake (e.g., from sleep mode), check for missed alerts.
+  - **Policy:** If an alert is > 15 minutes old, log it but do not notify. If < 15 minutes, trigger immediately.
+
+### 5.4 Popup Notification
+- **Window Properties:** `Topmost=true`, `SystemDecorations=None`, `ShowInTaskbar=false`.
+- **Focus:** CRITICAL: Must use `ShowActivated = false` (Win32 `SW_SHOWNOACTIVATE`) to avoid stealing keyboard focus from the user.
+
+### 5.5 Voice Synthesis Abstraction
 ```csharp
 public interface IVoiceService {
     Task SpeakAsync(string text, VoiceSettings settings);
@@ -92,13 +115,8 @@ public interface IVoiceService {
 }
 ```
 
-### 5.4 Popup Notification
-- Top-most window, positioned at the bottom-right (or platform equivalent).
-- Display current time and event summary.
-- Snooze button: Disables the specific alert for the configured duration.
-
 ## 6. Challenges & Solutions
-- **Fullscreen Detection:** Use platform-specific APIs (e.g., `GetForegroundWindow` + `GetWindowRect` on Windows) to detect if a fullscreen app is active.
+- **Focus Stealing:** Solved by platform-specific window flags (`ShowActivated=false`).
 - **Cross-platform TTS:** Implement platform-specific backends for `IVoiceService`.
 - **Sync Rotation:** `CalendarSyncService` will purge events older than 1 day and only cache up to 7 days forward to keep the JSON footprint small.
 
