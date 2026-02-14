@@ -1,16 +1,20 @@
 # Rawr - Design Document
 
 ## 1. Overview
-`Rawr` is a cross-platform desktop application built with Avalonia UI. It resides primarily in the system tray and provides voice-synthesized alerts and popup notifications for calendar events and scheduled intervals.
+`Rawr` is a cross-platform desktop application built with Avalonia UI. It resides primarily in the system tray and provides voice-synthesized alerts and popup notifications for:
+1.  **Calendar Events:** Meetings, appointments, and reminders from various sources.
+2.  **Interval Chimes:** Periodic alerts (e.g., hourly) to help users maintain awareness of time passing (useful for work/school blocks).
 
 ## 2. Technology Stack
 - **Framework:** Avalonia UI (Cross-platform XAML)
 - **Runtime:** .NET 10.0
 - **DI Container:** `Microsoft.Extensions.DependencyInjection`
 - **ICS Parsing:** `Ical.Net` (Standard library for iCalendar handling)
-- **Storage:** JSON (System.Text.Json) for settings and event caching.
+- **Storage:**
+  - **Settings/Cache:** JSON (System.Text.Json)
+  - **Secrets:** OS Native Credential Stores (Windows Credential Manager, macOS Keychain, Linux libsecret/Gnome Keyring).
 - **Logging:** Serilog (Rolling file sink, configurable).
-- **Concurrency:** `System.Threading.Channels` or `SemaphoreSlim` for safe repository access.
+- **Concurrency:** `SemaphoreSlim` for safe repository access; `System.Threading.Channels` for notification queuing.
 - **Resilience:** Polly (Retry policies, Circuit Breakers).
 - **Voice Synthesis:** Native OS API Abstraction (`IVoiceService`)
   - **Windows:** Hybrid `Windows.Media.SpeechSynthesis` (WinRT) with `System.Speech` (SAPI) fallback.
@@ -20,47 +24,52 @@
 ## 3. Architecture
 
 ### 3.1 Components
-- **Main Application:** Handles lifecycle, single-instance check, and tray icon management. Bootstrap via `Host.CreateDefaultBuilder`.
+- **Main Application:** Handles lifecycle, single-instance check, and tray icon management.
+  - **Tray Menu Actions:** `Dashboard` (Open UI), `Sync Now`, `Pause Alerts` (Toggle), `Settings`, `Exit`.
 - **Core Services:**
-  - `CalendarRepository`: **(Singleton)** Thread-safe in-memory store for events. Handles loading/saving to JSON.
+  - `CalendarRepository`: **(Singleton)** Thread-safe store. Handles expansion of recurring events into concrete instances.
   - `IOsIntegrationService`: Abstraction for OS-specific tasks (Start on Boot, Fullscreen detection, File Paths).
-  - `CalendarSyncService`: Background service that fetches `.ics` streams (Local/Remote, Auth support), parses them, and updates the `CalendarRepository`.
+  - `CalendarSyncService`: Background service that fetches `.ics` streams. Uses `ICredentialStore` to retrieve auth tokens.
   - `AlertScheduler`: **(Singleton)** Manages the "Next Alert" logic. Handles system sleep/wake resilience.
-  - `VoiceService`: Provides platform-specific TTS.
+  - `VoiceService`: Provides platform-specific TTS with audio device selection support.
   - `SettingsManager`: Handles persistence of user configuration.
   - `NotificationQueue`: **(Singleton)** Manages the serialization of popup alerts.
 - **UI Windows:**
   - `DashboardWindow`: Main interface showing upcoming events and status.
   - `SettingsWindow`: Tabbed interface for configuration.
   - `NotificationPopup`: Custom borderless window (Windows/macOS/X11).
-  - *Linux Wayland Strategy:* Uses `libnotify` (DBus) instead of custom window to ensure visibility and protocol compliance.
+  - *Linux Wayland Strategy:* Uses `libnotify` (DBus).
 
 ### 3.2 Data Flow
-1. **Sync:** `CalendarSyncService` fetches data -> parses via `Ical.Net` -> updates `CalendarRepository`.
+1. **Sync:** `CalendarSyncService` fetches data -> parses via `Ical.Net`.
+   - **Expansion:** Recurring events (RRULE) are expanded into concrete instances for a configurable look-ahead window (Default: **48 hours**).
 2. **Persistence:** `CalendarRepository` flushes changes to `events.json`.
 3. **Scheduling:** `AlertScheduler` calculates time to next event.
-   - **Resilience:** Uses `SystemEvents.PowerModeChanged` (Win/Linux/Mac abstractions) and a `PeriodicTimer` (Heartbeat, 30s) to detect sleep/wake cycles.
 4. **Trigger:** `AlertScheduler` wakes up -> pushes alert to `NotificationQueue`.
-   - **Filter:** If event is older than `MissedEventThreshold` (default 60m), it is logged and skipped.
+   - **Snooze:** Snooze state is **volatile** (in-memory only). If the app restarts, snoozed events are treated as if the snooze expired (or re-evaluated based on time).
 5. **Resilience:**
    - **Sync Failure:** Uses exponential backoff (Polly).
-   - **Feedback:** If sync fails > 3 times, tray icon updates to a "Warning" state to notify the user of connectivity/auth issues. Application operates on last known cached `events.json`.
+   - **Feedback:** Sync failure > 3 times updates tray icon to "Warning".
 
-### 3.3 File System & Paths
-Storage locations follow platform standards:
-- **Windows:** `%APPDATA%\Rawr` (e.g., `C:\Users\Dan\AppData\Roaming\Rawr`)
+### 3.3 Security & File System
+#### File Paths
+- **Windows:** `%APPDATA%\Rawr`
 - **macOS:** `~/Library/Application Support/Rawr`
-- **Linux:**
-  - Config: `$XDG_CONFIG_HOME/rawr` (default `~/.config/rawr`)
-  - Data: `$XDG_DATA_HOME/rawr` (default `~/.local/share/rawr`)
+- **Linux:** `$XDG_CONFIG_HOME/rawr` (Config), `$XDG_DATA_HOME/rawr` (Data)
+
+#### Credential Storage
+Authentication tokens are **never** stored in `events.json` or `settings.json`.
+- **Windows:** `Windows Credential Manager` (Generic Credentials).
+- **macOS:** `Keychain Services`.
+- **Linux:** `libsecret` (DBus Secret Service API) or `Gnome Keyring`.
+- *Fallback:* If a secure store is unavailable, prompt user for session-only credentials (do not persist to disk).
 
 ### 3.4 Diagnostics & Logging
 - **Library:** Serilog
-- **Configuration:**
-  - **Level:** User-configurable (Debug/Info/Warning/Error). Default: Information.
-  - **Output:** Rolling file strategy (e.g., `logs/rawr-.log`), kept for 7 days.
-  - **Location:** Subdirectory in the platform-specific data folder (e.g., `%APPDATA%\Rawr\Logs`).
-- **Context:** Logs should include the component source (e.g., `[CalendarSyncService]`) to trace silent failures in background tasks.
+- **Privacy:**
+  - **PII Redaction:** Event Titles, Descriptions, and Locations must be redacted or hashed in `Information` level logs.
+  - **Debug Mode:** Full details allowed only when `Logging.Level` is set to `Debug`.
+- **Configuration:** Rolling file strategy, kept for 7 days.
 
 ## 4. Implementation Details
 
@@ -68,23 +77,17 @@ Storage locations follow platform standards:
 The scheduler cannot rely solely on `Task.Delay`.
 - **Primary Mechanism:** Calculate `delay = nextEvent - now`. `Task.Delay(delay)`.
 - **Secondary Mechanism (Heartbeat):** A `PeriodicTimer` fires every 30 seconds.
-  - Checks if `DateTime.Now` > `nextEventTime`.
-  - Checks if a "Time Jump" occurred (e.g., `Now - LastCheckTime > 2 * Interval`).
-  - If a jump is detected (Wake from sleep), re-evaluate the schedule immediately.
 - **Missed Events:**
   - If `Now > EventTime + Config.MissedEventThresholdMinutes` (default 60), the event is **Discarded** (silent log).
   - If `Now <= EventTime + Threshold`, the event fires **Immediately** (catch-up).
 
 ### 4.2 Linux Strategy (Compatibility First)
 - **Visual Alerts:**
-  - **Goal:** Guarantee visibility and interaction on as many desktops as possible.
-  - **Primary (X11):** Custom `NotificationPopup` window. Allows for precise positioning and "Snooze/Dismiss" buttons.
+  - **Primary (X11):** Custom `NotificationPopup` window.
   - **Fallback (Wayland):** `libnotify` (org.freedesktop.Notifications).
-    - *Reasoning:* Custom windows cannot be reliably positioned on Wayland (security restriction). `libnotify` ensures the alert is seen, handled by the OS notification center.
-    - *Interaction:* Basic information only.
 - **Fullscreen Detection:**
   - **X11:** `_NET_ACTIVE_WINDOW` atom checks.
-  - **Wayland:** No standard protocol for "active window is fullscreen". Feature will be "Best Effort" or disabled on Wayland unless specific compositor protocols (like Hyprland IPC) are supported.
+  - **Wayland:** "Best Effort" or disabled.
 
 ### 4.3 Windows TTS Strategy
 - **Service:** `WindowsVoiceService`
@@ -92,8 +95,7 @@ The scheduler cannot rely solely on `Task.Delay`.
   1. Attempt to initialize `Windows.Media.SpeechSynthesis` (WinRT).
   2. If successful, enumerate "Modern" voices.
   3. Also enumerate `System.Speech` (SAPI) "Legacy" voices.
-  4. **Settings UI:** Allow user to select from a combined list (e.g., "[Modern] Microsoft Zira", "[Legacy] Microsoft Sam").
-  5. **Playback:** Use the appropriate engine based on the selected voice ID.
+  4. **Settings UI:** User selects Voice ID and Output Device.
 
 ## 5. Data Models (Updated)
 
@@ -105,15 +107,20 @@ The scheduler cannot rely solely on `Task.Delay`.
     "MissedEventThresholdMinutes": 60,
     "HeartbeatIntervalSeconds": 30
   },
+  "TimeAwareness": {
+    "Enabled": false,
+    "IntervalMinutes": 60, // e.g., Chime every hour
+    "Sound": "Chime" // or "Voice" to speak the time
+  },
   "Calendar": {
+    "LookAheadHours": 48,
     "Sources": [
       {
         "Id": "guid-1",
         "Name": "Personal",
         "Uri": "https://calendar.google.com/...",
-        "Type": "Remote", // Remote, Local
-        "AuthType": "None", // None, Basic, Bearer
-        "AuthToken": "", // Stored in plain text for MVP (User warning required)
+        "Type": "Remote", 
+        "AuthType": "Basic", // Credentials stored in OS Store using 'Rawr:{Id}' key
         "Color": "#FF0000",
         "Enabled": true
       }
@@ -121,8 +128,9 @@ The scheduler cannot rely solely on `Task.Delay`.
     "SyncIntervalMinutes": 15
   },
   "Voice": {
-    "Engine": "Auto",  // Auto, WinRT, SAPI, Embedded
+    "Engine": "Auto",
     "VoiceId": "Default",
+    "DeviceId": "Default", // or specific GUID/Name
     "Rate": 1.0,
     "Volume": 100
   },
@@ -131,7 +139,7 @@ The scheduler cannot rely solely on `Task.Delay`.
     "RetentionDays": 7
   },
   "Linux": {
-    "ForceCustomWindow": false, // If false, uses libnotify on Wayland
+    "ForceCustomWindow": false,
     "NotificationUrgency": "Critical"
   }
 }
