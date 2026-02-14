@@ -5,18 +5,19 @@ Build the visual interface for users to see events and configure the app.
 
 ## Steps
 1.  **Dashboard View**:
-    *   Display list of "Upcoming Events".
-    *   Show status of Sync (Last run, success/fail).
-    *   "Snooze/Dismiss" buttons for active alerts (if any).
+    *   [x] Display list of "Upcoming Events".
+    *   [x] Show status of Sync (Last run, success/fail).
+    *   [x] "Snooze/Dismiss" buttons for active alerts (if any).
 
 2.  **Settings View**:
-    *   Tabbed interface: `General`, `Calendar`, `Voice`.
-    *   **Calendar**: List sources, Add/Remove/Edit Source (URL, Color).
-    *   **Voice**: Dropdown for Voice selection, Slider for Volume/Rate. Test button for TTS.
-    *   Bind these views to `SettingsViewModel` which interacts with `SettingsManager`.
+    *   [x] Tabbed interface: `General`, `Calendar`, `Voice`.
+    *   [x] **Calendar**: List sources, Add/Remove/Edit Source (URL, Color).
+    *   [x] **Voice**: Dropdown for Voice selection, Slider for Volume/Rate. Test button for TTS.
+    *   [x] Bind these views to `SettingsViewModel` which interacts with `SettingsManager`.
 
 3.  **Validation**:
-    *   Ensure settings are saved immediately or on "Apply".
+    *   [x] Ensure settings are saved immediately or on "Apply".
 
 ## Testing
 *   **Manual**: Verify binding works (changing setting updates JSON file).
+*   **Build**: Project builds successfully.

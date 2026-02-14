@@ -19,4 +19,12 @@ public class DummyVoiceService : IVoiceService
         // Return an empty stream
         return Task.FromResult<Stream>(new MemoryStream());
     }
+
+    public IEnumerable<VoiceInfo> GetInstalledVoices()
+    {
+        return new[]
+        {
+            new VoiceInfo { Id = "Default", Name = "Default Voice", Culture = "en-US", Gender = "Neutral" }
+        };
+    }
 }

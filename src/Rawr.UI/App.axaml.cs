@@ -9,6 +9,7 @@ using Rawr.Infrastructure.Persistence;
 using Rawr.Infrastructure.Services;
 using Rawr.Core.Services;
 using Rawr.Services;
+using Rawr.ViewModels;
 using Serilog;
 using System;
 using System.Net.Http;
@@ -42,7 +43,11 @@ namespace Rawr
 
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
-                desktop.MainWindow = new MainWindow();
+                var dashboardVm = Services.GetRequiredService<DashboardViewModel>();
+                desktop.MainWindow = new DashboardWindow
+                {
+                    DataContext = dashboardVm
+                };
                 desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
             }
 
@@ -60,6 +65,7 @@ namespace Rawr
             services.AddSingleton<ICalendarRepository, CalendarRepository>();
             services.AddSingleton<ICalendarSyncService, CalendarSyncService>();
             services.AddSingleton<IAlertScheduler, AlertScheduler>();
+            services.AddSingleton<NotificationQueue>();
             services.AddSingleton<TrayIconService>();
 
             if (OperatingSystem.IsWindows())
@@ -72,6 +78,9 @@ namespace Rawr
                 services.AddSingleton<IVoiceService, DummyVoiceService>();
                 services.AddSingleton<IAudioPlaybackService, DummyPlaybackService>();
             }
+
+            services.AddTransient<DashboardViewModel>();
+            services.AddTransient<SettingsViewModel>();
         }
 
         private void OnDashboardClick(object? sender, EventArgs e)
@@ -80,7 +89,11 @@ namespace Rawr
             {
                 if (desktop.MainWindow == null)
                 {
-                    desktop.MainWindow = new MainWindow();
+                    var dashboardVm = Services?.GetRequiredService<DashboardViewModel>();
+                    desktop.MainWindow = new DashboardWindow
+                    {
+                        DataContext = dashboardVm
+                    };
                 }
                 
                 desktop.MainWindow.Show();
@@ -108,7 +121,7 @@ namespace Rawr
         {
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
-                if (desktop.MainWindow is MainWindow mw)
+                if (desktop.MainWindow is DashboardWindow mw)
                 {
                     mw.CanClose = true;
                 }

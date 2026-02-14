@@ -71,4 +71,32 @@ public class WindowsVoiceService : IVoiceService
             return (Stream)memoryStream;
         });
     }
+
+    public IEnumerable<Rawr.Core.Models.VoiceInfo> GetInstalledVoices()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return new List<Rawr.Core.Models.VoiceInfo>();
+        }
+
+        try
+        {
+            using var synth = new SpeechSynthesizer();
+            return synth.GetInstalledVoices()
+                .Where(v => v.Enabled)
+                .Select(v => new Rawr.Core.Models.VoiceInfo
+                {
+                    Id = v.VoiceInfo.Name,
+                    Name = v.VoiceInfo.Name,
+                    Culture = v.VoiceInfo.Culture.Name,
+                    Gender = v.VoiceInfo.Gender.ToString()
+                })
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting installed voices.");
+            return new List<Rawr.Core.Models.VoiceInfo>();
+        }
+    }
 }

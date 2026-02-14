@@ -1,0 +1,67 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:Rawr.ViewModels"
+        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+        x:Class="Rawr.DashboardWindow"
+        x:DataType="vm:DashboardViewModel"
+        Title="Rawr Dashboard"
+        Icon="/Assets/dinosaur.ico"
+        Width="800" Height="600"
+        WindowStartupLocation="CenterScreen">
+
+  <Design.DataContext>
+    <vm:DashboardViewModel />
+  </Design.DataContext>
+
+  <DockPanel LastChildFill="True">
+    <!-- Top Bar -->
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="*, Auto, Auto" Margin="10">
+      <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+        <TextBlock Text="Status:" FontWeight="Bold" />
+        <TextBlock Text="{Binding SyncStatus}" />
+      </StackPanel>
+      
+      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
+        <Button Command="{Binding SyncNowCommand}" Content="Sync Now" />
+        <Button Name="SettingsButton" Content="Settings" Click="OnSettingsClicked" />
+      </StackPanel>
+    </Grid>
+
+    <Grid RowDefinitions="Auto, *">
+        <!-- Active Alerts -->
+        <Border Grid.Row="0" Margin="10" BorderBrush="Red" BorderThickness="2" CornerRadius="5" IsVisible="{Binding ActiveAlerts.Count}">
+            <StackPanel Margin="10">
+                <TextBlock Text="ACTIVE ALERTS" FontWeight="Bold" Foreground="Red" HorizontalAlignment="Center" Margin="0,0,0,10"/>
+                <ItemsControl ItemsSource="{Binding ActiveAlerts}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid ColumnDefinitions="*, Auto" Margin="0,5">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding Title}" FontWeight="Bold"/>
+                                    <TextBlock Text="{Binding Start, StringFormat='{}{0:t}'}" FontStyle="Italic"/>
+                                </StackPanel>
+                                <Button Grid.Column="1" Content="Dismiss" 
+                                        Command="{Binding $parent[Window].((vm:DashboardViewModel)DataContext).DismissAlertCommand}" 
+                                        CommandParameter="{Binding .}" />
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </Border>
+
+        <!-- Main Content -->
+        <DataGrid Grid.Row="1" Margin="10" ItemsSource="{Binding UpcomingEvents}" AutoGenerateColumns="False" IsReadOnly="True" GridLinesVisibility="All" BorderThickness="1" BorderBrush="Gray">
+          <DataGrid.Columns>
+            <DataGridTextColumn Header="Time" Binding="{Binding Start, StringFormat='{}{0:g}'}" Width="Auto" />
+            <DataGridTextColumn Header="Title" Binding="{Binding Title}" Width="*" />
+            <DataGridTextColumn Header="Location" Binding="{Binding Location}" Width="2*" />
+            <DataGridCheckBoxColumn Header="All Day" Binding="{Binding IsAllDay}" Width="Auto" />
+            <DataGridTextColumn Header="Source" Binding="{Binding SourceId}" Width="Auto" />
+          </DataGrid.Columns>
+        </DataGrid>
+    </Grid>
+  </DockPanel>
+</Window>
