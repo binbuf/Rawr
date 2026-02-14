@@ -34,11 +34,54 @@ namespace Rawr
             Services = services.BuildServiceProvider();
 
             // Initialize TrayIconService
-            var trayService = Services.GetRequiredService<TrayIconService>();
-            var trayIcons = TrayIcon.GetIcons(this);
-            if (trayIcons != null && trayIcons.Count > 0)
+            try
             {
-                trayService.Initialize(trayIcons[0]);
+                var trayService = Services.GetRequiredService<TrayIconService>();
+                
+                // Create TrayIcon programmatically
+                var trayIcon = new TrayIcon
+                {
+                    ToolTipText = "Rawr",
+                    IsVisible = true,
+                };
+                
+                // Create Menu
+                var menu = new NativeMenu();
+                
+                var dashboardItem = new NativeMenuItem("Dashboard");
+                dashboardItem.Click += OnDashboardClick;
+                menu.Items.Add(dashboardItem);
+
+                var syncItem = new NativeMenuItem("Sync Now");
+                syncItem.Click += OnSyncNowClick;
+                menu.Items.Add(syncItem);
+
+                menu.Items.Add(new NativeMenuItemSeparator());
+
+                var settingsItem = new NativeMenuItem("Settings");
+                settingsItem.Click += OnSettingsClick;
+                menu.Items.Add(settingsItem);
+
+                var exitItem = new NativeMenuItem("Exit");
+                exitItem.Click += OnExitClick;
+                menu.Items.Add(exitItem);
+
+                trayIcon.Menu = menu;
+
+                // Add to application
+                var icons = TrayIcon.GetIcons(this);
+                if (icons == null)
+                {
+                    icons = new TrayIcons();
+                    TrayIcon.SetIcons(this, icons);
+                }
+                icons.Add(trayIcon);
+
+                trayService.Initialize(trayIcon);
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Failed to initialize TrayIconService");
             }
 
             // Start Background Services
@@ -55,11 +98,6 @@ namespace Rawr
 
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
-                var dashboardVm = Services.GetRequiredService<DashboardViewModel>();
-                desktop.MainWindow = new DashboardWindow
-                {
-                    DataContext = dashboardVm
-                };
                 desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
             }
 

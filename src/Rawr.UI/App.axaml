@@ -6,19 +6,6 @@
 
     <Application.Styles>
         <FluentTheme />
+        <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml"/>
     </Application.Styles>
-
-    <TrayIcon.Icons>
-        <TrayIcon Icon="/Assets/dinosaur.ico" ToolTipText="Rawr">
-            <TrayIcon.Menu>
-                <NativeMenu>
-                    <NativeMenuItem Header="Dashboard" Click="OnDashboardClick" />
-                    <NativeMenuItem Header="Sync Now" Click="OnSyncNowClick" />
-                    <NativeMenuItemSeparator />
-                    <NativeMenuItem Header="Settings" Click="OnSettingsClick" />
-                    <NativeMenuItem Header="Exit" Click="OnExitClick" />
-                </NativeMenu>
-            </TrayIcon.Menu>
-        </TrayIcon>
-    </TrayIcon.Icons>
 </Application>
