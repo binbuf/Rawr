@@ -20,6 +20,9 @@
   - **Windows:** Hybrid `Windows.Media.SpeechSynthesis` (WinRT) with `System.Speech` (SAPI) fallback.
   - **macOS:** `NSSpeechSynthesizer` (via interop)
   - **Linux:** `speech-dispatcher` or `espeak` via CLI/library.
+- **Audio Playback:** Abstraction (`IAudioPlaybackService`)
+  - **Purpose:** Decouples TTS generation from playback to allow specific output device selection (e.g., "Headphones" vs "Speakers").
+  - **Implementations:** `NAudio` (Windows), `miniaudio` / `NetCoreAudio` (Cross-platform) or platform-specific APIs.
 
 ## 3. Architecture
 
@@ -31,7 +34,9 @@
   - `IOsIntegrationService`: Abstraction for OS-specific tasks (Start on Boot, Fullscreen detection, File Paths).
   - `CalendarSyncService`: Background service that fetches `.ics` streams. Uses `ICredentialStore` to retrieve auth tokens.
   - `AlertScheduler`: **(Singleton)** Manages the "Next Alert" logic. Handles system sleep/wake resilience.
-  - `VoiceService`: Provides platform-specific TTS with audio device selection support.
+  - `TimeAwarenessService`: **(Singleton)** Manages periodic "chimes" or time announcements (e.g., hourly). Independent of calendar events.
+  - `VoiceService`: Generates TTS audio streams.
+  - `AudioPlaybackService`: Routes audio streams to the configured output device.
   - `SettingsManager`: Handles persistence of user configuration.
   - `NotificationQueue`: **(Singleton)** Manages the serialization of popup alerts.
 - **UI Windows:**
@@ -63,6 +68,11 @@ Authentication tokens are **never** stored in `events.json` or `settings.json`.
 - **macOS:** `Keychain Services`.
 - **Linux:** `libsecret` (DBus Secret Service API) or `Gnome Keyring`.
 - *Fallback:* If a secure store is unavailable, prompt user for session-only credentials (do not persist to disk).
+
+#### Authentication Types
+- **PrivateUrl:** **(Preferred)** Uses a "Secret Address" (e.g., Google/Outlook private iCal URL). No authentication headers required; the token is in the URL.
+- **Basic:** Standard Username/Password. **Note:** Not supported by modern Google/Microsoft accounts (require OAuth). Only for generic CalDAV/HTTP auth.
+- **OAuth2:** *Not currently implemented.* Future scope for direct API integration.
 
 ### 3.4 Diagnostics & Logging
 - **Library:** Serilog
@@ -120,7 +130,7 @@ The scheduler cannot rely solely on `Task.Delay`.
         "Name": "Personal",
         "Uri": "https://calendar.google.com/...",
         "Type": "Remote", 
-        "AuthType": "Basic", // Credentials stored in OS Store using 'Rawr:{Id}' key
+        "AuthType": "PrivateUrl", // "PrivateUrl" (No Headers) or "Basic" (User/Pass in OS Store)
         "Color": "#FF0000",
         "Enabled": true
       }
@@ -155,3 +165,28 @@ The scheduler cannot rely solely on `Task.Delay`.
 ## 7. Future Considerations
 - **Plugin System:** For "Active Window" detection on specific Wayland compositors (Hyprland, Sway).
 - **Mobile Companion:** Sync settings via QR code.
+
+## 8. Project Structure
+Recommended folder layout to separate concerns, might need to rearrange from current structure.
+
+```
+/
+├── Rawr.sln
+├── src/
+│   ├── Rawr.Core/             # Business Logic, Interfaces, Models (NetStandard 2.1 / .NET 10)
+│   │   ├── Domain/
+│   │   ├── Interfaces/
+│   │   └── Services/
+│   ├── Rawr.UI/               # Avalonia Application (The "Head")
+│   │   ├── Views/
+│   │   ├── ViewModels/
+│   │   ├── Assets/
+│   │   └── Program.cs
+│   └── Rawr.Infrastructure/   # Concrete Implementations (Audio, OS, Persistence)
+│       ├── Audio/
+│       ├── Platform/
+│       └── Persistence/
+└── tests/
+    ├── Rawr.Core.Tests/
+    └── Rawr.Infrastructure.Tests/
+```
