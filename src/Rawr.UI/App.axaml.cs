@@ -6,6 +6,7 @@ using Rawr.Core.Interfaces;
 using Rawr.Infrastructure.Configuration;
 using Rawr.Infrastructure.Persistence;
 using Rawr.Infrastructure.Services;
+using Rawr.Core.Services;
 using Serilog;
 using System;
 using System.Net.Http;
@@ -46,6 +47,7 @@ namespace Rawr
             services.AddSingleton<ICalendarParser, CalendarParser>();
             services.AddSingleton<ICalendarRepository, CalendarRepository>();
             services.AddSingleton<ICalendarSyncService, CalendarSyncService>();
+            services.AddSingleton<IAlertScheduler, AlertScheduler>();
         }
     }
 }
