@@ -27,7 +27,7 @@
             </StackPanel>
 
             <StackPanel Grid.Row="1" VerticalAlignment="Center">
-                <TextBlock Text="{Binding Time}" FontSize="14" />
+                <TextBlock Text="{Binding Time}" FontSize="14" IsVisible="{Binding !IsIntervalAlert}" />
                 <TextBlock Text="{Binding OriginalTimeInfo}" FontSize="11" Foreground="Gray" IsVisible="{Binding OriginalTimeInfo, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                 <TextBlock Text="{Binding Location}" FontSize="12" FontStyle="Italic" TextWrapping="Wrap" IsVisible="{Binding Location, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
             </StackPanel>
