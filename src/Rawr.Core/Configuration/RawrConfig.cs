@@ -63,7 +63,7 @@ public partial class NotificationConfig : ObservableObject
     private int _alertFlashDurationSeconds = 10;
 
     [ObservableProperty]
-    private bool _showTimezone = true;
+    private bool _showLocalTimezone = true;
 }
 
 public partial class TimeAwarenessConfig : ObservableObject
