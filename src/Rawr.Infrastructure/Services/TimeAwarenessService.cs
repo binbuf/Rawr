@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -84,6 +85,14 @@ public class TimeAwarenessService : ITimeAwarenessService, IDisposable
                 }
 
                 var now = _timeProvider.GetLocalNow();
+                
+                if (!IsWithinSchedule(now, settings))
+                {
+                    // Check again in a minute if we are now in schedule
+                    await Task.Delay(TimeSpan.FromMinutes(1), token);
+                    continue;
+                }
+
                 var nextInterval = CalculateNextInterval(now, settings.IntervalMinutes);
                 var delay = nextInterval - now;
 
@@ -98,9 +107,9 @@ public class TimeAwarenessService : ITimeAwarenessService, IDisposable
                 
                 // Reload settings to get fresh config
                 settings = _settingsManager.Settings.TimeAwareness; 
-                if (!settings.Enabled) continue;
+                if (!settings.Enabled || !IsWithinSchedule(_timeProvider.GetLocalNow(), settings)) continue;
 
-                await AnnounceTimeAsync(now, token);
+                await AnnounceTimeAsync(_timeProvider.GetLocalNow(), token);
 
                 // Wait a tiny bit to avoid double triggering if calculation was slightly off (e.g. 1ms before minute)
                 await Task.Delay(TimeSpan.FromSeconds(2), token);
@@ -115,6 +124,22 @@ public class TimeAwarenessService : ITimeAwarenessService, IDisposable
             _logger.LogError(ex, "Error in TimeAwarenessService loop.");
             try { await Task.Delay(TimeSpan.FromMinutes(1), token); } catch { }
         }
+    }
+
+    private bool IsWithinSchedule(DateTimeOffset now, TimeAwarenessConfig settings)
+    {
+        if (!settings.Enabled) return false;
+        if (settings.Schedule == null || settings.Schedule.Count == 0) return true;
+
+        var daySchedule = settings.Schedule.FirstOrDefault(s => s.Day == now.DayOfWeek);
+        if (daySchedule == null || !daySchedule.IsEnabled) return false;
+
+        var currentTime = now.TimeOfDay;
+        
+        var startTime = daySchedule.StartTime ?? TimeSpan.Zero;
+        var endTime = daySchedule.EndTime ?? new TimeSpan(23, 59, 59);
+        
+        return currentTime >= startTime && currentTime <= endTime;
     }
 
     public async Task TriggerTimeAnnouncementManual(DateTimeOffset? simulatedTime = null)

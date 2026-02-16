@@ -121,6 +121,37 @@
           <CheckBox IsChecked="{Binding Config.Notifications.ShowLocalTimezone, Mode=TwoWay}" Content="Show local timezone in notification popup" Margin="0,10,0,0" />
         </StackPanel>
       </TabItem>
+
+      <!-- Interval Schedule Tab -->
+      <TabItem Header="Interval Schedule">
+        <ScrollViewer>
+          <StackPanel Spacing="10" Margin="10">
+            <CheckBox IsChecked="{Binding Config.TimeAwareness.Enabled, Mode=TwoWay}" Content="Enable Interval Announcements" />
+            <StackPanel Orientation="Horizontal" Spacing="10">
+              <TextBlock VerticalAlignment="Center" Text="Interval (minutes):" Width="120" />
+              <NumericUpDown Value="{Binding Config.TimeAwareness.IntervalMinutes, Mode=TwoWay}" Minimum="1" Maximum="1440" Width="150" />
+            </StackPanel>
+            
+            <Separator Margin="0,10" />
+            <TextBlock Text="Active Hours" FontWeight="Bold" />
+            <TextBlock Text="Set the time range for each day when announcements should be active." FontStyle="Italic" FontSize="11" />
+            
+            <ItemsControl ItemsSource="{Binding IntervalSchedule}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Grid ColumnDefinitions="120, Auto, Auto, Auto, Auto" Margin="0,5">
+                    <CheckBox Grid.Column="0" Content="{Binding Day}" IsChecked="{Binding IsEnabled, Mode=TwoWay}" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="1" Text="From:" VerticalAlignment="Center" Margin="10,0" IsEnabled="{Binding IsEnabled}" />
+                    <TimePicker Grid.Column="2" SelectedTime="{Binding StartTime, Mode=TwoWay}" IsEnabled="{Binding IsEnabled}" ClockIdentifier="24HourClock" />
+                    <TextBlock Grid.Column="3" Text="To:" VerticalAlignment="Center" Margin="10,0" IsEnabled="{Binding IsEnabled}" />
+                    <TimePicker Grid.Column="4" SelectedTime="{Binding EndTime, Mode=TwoWay}" IsEnabled="{Binding IsEnabled}" ClockIdentifier="24HourClock" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
     </TabControl>
   </DockPanel>
 </Window>

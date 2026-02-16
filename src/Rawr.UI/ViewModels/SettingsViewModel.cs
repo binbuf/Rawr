@@ -52,6 +52,9 @@ public partial class SettingsViewModel : ObservableObject
     private ObservableCollection<CalendarSource> _calendarSources = new();
 
     [ObservableProperty]
+    private ObservableCollection<DaySchedule> _intervalSchedule = new();
+
+    [ObservableProperty]
     private ObservableCollection<string> _availableVoices = new();
 
     [ObservableProperty]
@@ -63,6 +66,7 @@ public partial class SettingsViewModel : ObservableObject
         
         Config = _settingsManager.Settings;
         CalendarSources = new ObservableCollection<CalendarSource>(Config.Calendar.Sources);
+        IntervalSchedule = new ObservableCollection<DaySchedule>(Config.TimeAwareness.Schedule);
         
         var voices = _voiceService.GetInstalledVoices();
         AvailableVoices = new ObservableCollection<string>(voices.Select(v => v.Name));
@@ -72,6 +76,7 @@ public partial class SettingsViewModel : ObservableObject
     private void Save()
     {
         Config.Calendar.Sources = CalendarSources.ToList();
+        Config.TimeAwareness.Schedule = IntervalSchedule.ToList();
         _settingsManager.Save();
         _osIntegrationService.SetStartWithOs(Config.General.StartWithOS);
     }

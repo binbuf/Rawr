@@ -76,6 +76,33 @@ public partial class TimeAwarenessConfig : ObservableObject
 
     [ObservableProperty]
     private string _sound = "Chime"; // or "Voice"
+
+    [ObservableProperty]
+    private List<DaySchedule> _schedule = new()
+    {
+        new() { Day = DayOfWeek.Monday, IsEnabled = true, StartTime = new TimeSpan(9, 0, 0), EndTime = new TimeSpan(17, 0, 0) },
+        new() { Day = DayOfWeek.Tuesday, IsEnabled = true, StartTime = new TimeSpan(9, 0, 0), EndTime = new TimeSpan(17, 0, 0) },
+        new() { Day = DayOfWeek.Wednesday, IsEnabled = true, StartTime = new TimeSpan(9, 0, 0), EndTime = new TimeSpan(17, 0, 0) },
+        new() { Day = DayOfWeek.Thursday, IsEnabled = true, StartTime = new TimeSpan(9, 0, 0), EndTime = new TimeSpan(17, 0, 0) },
+        new() { Day = DayOfWeek.Friday, IsEnabled = true, StartTime = new TimeSpan(9, 0, 0), EndTime = new TimeSpan(17, 0, 0) },
+        new() { Day = DayOfWeek.Saturday, IsEnabled = false, StartTime = new TimeSpan(9, 0, 0), EndTime = new TimeSpan(17, 0, 0) },
+        new() { Day = DayOfWeek.Sunday, IsEnabled = false, StartTime = new TimeSpan(9, 0, 0), EndTime = new TimeSpan(17, 0, 0) },
+    };
+}
+
+public partial class DaySchedule : ObservableObject
+{
+    [ObservableProperty]
+    private DayOfWeek _day;
+
+    [ObservableProperty]
+    private bool _isEnabled;
+
+    [ObservableProperty]
+    private TimeSpan? _startTime;
+
+    [ObservableProperty]
+    private TimeSpan? _endTime;
 }
 
 public partial class CalendarConfig : ObservableObject
