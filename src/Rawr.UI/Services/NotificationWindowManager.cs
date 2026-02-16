@@ -144,26 +144,22 @@ public class NotificationWindowManager : IDisposable
     {
         try
         {
+            // Skip audio for interval based alerts, as TimeAwarenessService handles them
+            if (evt.Uid?.StartsWith("interval_") == true)
+            {
+                return;
+            }
+
             var voiceSettings = _settingsManager.Settings.Voice;
             if (voiceSettings.Muted)
             {
                 return;
             }
 
-
-            // Improved speech for interval based alerts
-            string text;
-            if (evt.Uid?.StartsWith("interval_") == true)
+            string text = $"Reminder: {evt.Title}.";
+            if (!evt.IsAllDay)
             {
-                text = $"The time is {evt.Title}.";
-            }
-            else
-            {
-                text = $"Reminder: {evt.Title}.";
-                if (!evt.IsAllDay)
-                {
-                    text += $" at {evt.Start.LocalDateTime:t}";
-                }
+                text += $" at {evt.Start.LocalDateTime:t}";
             }
 
             var options = new VoiceOptions
