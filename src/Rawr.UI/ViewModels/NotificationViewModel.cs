@@ -33,6 +33,7 @@ public partial class NotificationViewModel : ObservableObject
             var localStart = _calendarEvent.Start.LocalDateTime;
             var localEnd = _calendarEvent.End.LocalDateTime;
 
+            // TODO: update this line to show abbreviated timezone (e.g. PST, PDT, MST, EST) if "Show timezone in notification popup" is checked
             return $"{localStart:t} - {localEnd:t}";
         }
     }
@@ -72,10 +73,8 @@ public partial class NotificationViewModel : ObservableObject
             var originalTimeStr = _calendarEvent.OriginalStartTime.HasValue 
                 ? $"{_calendarEvent.OriginalStartTime.Value:t} ({originalTzId})" 
                 : $"({originalTzId})";
-            
-            var localTimeStr = $"{_calendarEvent.Start.LocalDateTime:t} ({localTzId})";
 
-            return $"{originalTimeStr} / {localTimeStr}";
+            return $"{originalTimeStr}";
         }
     }
 

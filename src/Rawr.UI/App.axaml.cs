@@ -270,22 +270,6 @@ namespace Rawr
             
             debugMenu.Items.Add(intervalItem);
 
-            var sampleEventItem = new NativeMenuItem("Trigger Sample 1-Hour Event");
-            sampleEventItem.Click += (s, e) => {
-                var scheduler = Services?.GetRequiredService<IAlertScheduler>();
-                var now = DateTimeOffset.Now;
-                var dummyEvent = new CalendarEvent
-                {
-                    Uid = $"sample_{now.Ticks}",
-                    Title = "Sample 1-Hour Meeting",
-                    Start = now,
-                    End = now.AddHours(1),
-                    Description = "This is a sample event with a 1-hour duration."
-                };
-                scheduler?.TriggerAlertManual(dummyEvent);
-            };
-            debugMenu.Items.Add(sampleEventItem);
-
             // Event Based
             var eventBasedMenu = new NativeMenu();
             var eventBasedItem = new NativeMenuItem("Event Based Alert") { Menu = eventBasedMenu };
