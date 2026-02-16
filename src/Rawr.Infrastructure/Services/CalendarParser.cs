@@ -92,15 +92,15 @@ public class CalendarParser : ICalendarParser
                 TimeSpan duration = TimeSpan.Zero;
                 if (evt.DtEnd != null && evt.DtStart != null)
                 {
-                    duration = evt.DtEnd.Value - evt.DtStart.Value;
+                    duration = evt.DtEnd.AsUtc - evt.DtStart.AsUtc;
                 }
                 else if (evt.Duration != null && evt.DtStart != null)
                 {
-                    duration = evt.DtStart.Add((Ical.Net.DataTypes.Duration)evt.Duration).Value - evt.DtStart.Value;
+                    duration = evt.DtStart.Add((Ical.Net.DataTypes.Duration)evt.Duration).AsUtc - evt.DtStart.AsUtc;
                 }
                 else if (occurrence.Period.EndTime != null && occurrence.Period.StartTime != null)
                 {
-                    duration = occurrence.Period.EndTime.Value - occurrence.Period.StartTime.Value;
+                    duration = occurrence.Period.EndTime.AsUtc - occurrence.Period.StartTime.AsUtc;
                 }
 
                 DateTimeOffset endDt = startDt.Add(duration);
