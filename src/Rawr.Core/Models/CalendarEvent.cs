@@ -12,8 +12,10 @@ public class CalendarEvent
     public DateTimeOffset End { get; set; }
     public bool IsAllDay { get; set; }
     public string SourceId { get; set; } = string.Empty;
+    public string SourceName { get; set; } = string.Empty;
 
     public DateTime LocalTime => Start.LocalDateTime;
+    public DateTime LocalEndTime => End.LocalDateTime;
 
     public DateTime? OriginalStartTime { get; set; }
     public string? OriginalTimeZoneId { get; set; }

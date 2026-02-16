@@ -157,11 +157,11 @@ public class TimeAwarenessService : ITimeAwarenessService, IDisposable
             string speechText;
             if (now.Minute == 0)
             {
-                speechText = $"It is {now:h} {now:tt}";
+                speechText = $"The time is {now:h} {now:tt}";
             }
             else
             {
-                speechText = $"It is {now:h mm tt}";
+                speechText = $"The time is {now:h mm tt}";
             }
 
             _logger.LogInformation("Announcing time: {SpeechText}", speechText);

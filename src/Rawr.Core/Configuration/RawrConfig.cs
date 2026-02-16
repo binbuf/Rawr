@@ -58,6 +58,12 @@ public partial class NotificationConfig : ObservableObject
 
     [ObservableProperty]
     private bool _hideOnFullscreen = true;
+
+    [ObservableProperty]
+    private int _alertFlashDurationSeconds = 30;
+
+    [ObservableProperty]
+    private bool _showTimezone = true;
 }
 
 public partial class TimeAwarenessConfig : ObservableObject

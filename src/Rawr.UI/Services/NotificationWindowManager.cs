@@ -101,7 +101,7 @@ public class NotificationWindowManager : IDisposable
     {
         _currentEvent = evt;
         var config = _settingsManager.Settings.Notifications;
-        var vm = new NotificationViewModel(evt, _notificationQueue);
+        var vm = new NotificationViewModel(evt, _notificationQueue, _settingsManager);
         _currentWindow = new NotificationWindow(vm, config);
         _currentWindow.Closed += (s, e) => 
         {
@@ -151,13 +151,10 @@ public class NotificationWindowManager : IDisposable
             }
 
             string text = $"Reminder: {evt.Title}.";
-            
-            // If time is now or very close, say "Now".
-            // If it's in future, say time?
-            // "Meeting with Bob at 3 PM."
+
             if (!evt.IsAllDay)
             {
-                text += $" at {evt.Start:t}";
+                text += $" at {evt.Start.LocalDateTime:t}";
             }
 
             var options = new VoiceOptions

@@ -133,6 +133,7 @@ public class CalendarParser : ICalendarParser
                     End = endDt,
                     IsAllDay = evt.IsAllDay,
                     SourceId = source.Id,
+                    SourceName = source.Name,
                     OriginalStartTime = s.Value,
                     OriginalTimeZoneId = s.TzId
                 });

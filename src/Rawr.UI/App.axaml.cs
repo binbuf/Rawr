@@ -273,9 +273,11 @@ namespace Rawr
             // Event Based
             var eventBasedMenu = new NativeMenu();
             var eventBasedItem = new NativeMenuItem("Event Based Alert") { Menu = eventBasedMenu };
-            
+
             var refreshEventsItem = new NativeMenuItem("Refresh Events List");
-            refreshEventsItem.Click += (s, e) => {
+
+            void PopulateEventMenu()
+            {
                 // Remove all items except the refresh item itself
                 for (int i = eventBasedMenu.Items.Count - 1; i >= 0; i--)
                 {
@@ -285,16 +287,26 @@ namespace Rawr
                     }
                 }
                 eventBasedMenu.Items.Add(new NativeMenuItemSeparator());
-                
+
                 Task.Run(async () => {
                     var repo = Services?.GetRequiredService<ICalendarRepository>();
                     if (repo == null) return;
-                    
+
                     var evts = (await repo.GetAllEventsAsync(CancellationToken.None))
                                     .OrderBy(o => o.Start)
                                     .ToList();
 
                     Dispatcher.UIThread.Post(() => {
+                        // Clear again in case of race
+                        for (int i = eventBasedMenu.Items.Count - 1; i >= 0; i--)
+                        {
+                            if (eventBasedMenu.Items[i] != refreshEventsItem &&
+                                eventBasedMenu.Items[i] is not NativeMenuItemSeparator)
+                            {
+                                eventBasedMenu.Items.RemoveAt(i);
+                            }
+                        }
+
                         if (evts.Count == 0)
                         {
                             eventBasedMenu.Items.Add(new NativeMenuItem("(No events found)"));
@@ -313,9 +325,14 @@ namespace Rawr
                         }
                     });
                 });
-            };
+            }
+
+            refreshEventsItem.Click += (s, e) => PopulateEventMenu();
             eventBasedMenu.Items.Add(refreshEventsItem);
-            
+
+            // Auto-populate on creation
+            PopulateEventMenu();
+
             debugMenu.Items.Add(eventBasedItem);
             menu.Items.Add(debugItem);
 #endif
@@ -353,7 +370,7 @@ namespace Rawr
                 var dummyEvent = new CalendarEvent
                 {
                     Uid = $"interval_{next.Ticks}",
-                    Title = $"Time Marker: {next:t}",
+                    Title = $"{next:t}",
                     Start = next,
                     End = next.AddMinutes(1),
                     Description = $"Triggered {minutes} minute interval marker."
