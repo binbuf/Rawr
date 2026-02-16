@@ -60,7 +60,7 @@ public partial class NotificationConfig : ObservableObject
     private bool _hideOnFullscreen = true;
 
     [ObservableProperty]
-    private int _alertFlashDurationSeconds = 30;
+    private int _alertFlashDurationSeconds = 10;
 
     [ObservableProperty]
     private bool _showTimezone = true;

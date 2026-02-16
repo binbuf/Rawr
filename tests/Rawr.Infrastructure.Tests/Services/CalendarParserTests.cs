@@ -78,6 +78,29 @@ public class CalendarParserTests
         Assert.Single(result);
         Assert.Equal("One Off", result[0].Title);
         Assert.Equal(new DateTimeOffset(2023, 10, 1, 15, 0, 0, TimeSpan.Zero), result[0].Start);
+        Assert.Equal(new DateTimeOffset(2023, 10, 1, 16, 0, 0, TimeSpan.Zero), result[0].End);
+    }
+    
+    [Fact]
+    public void Parse_EventWithDuration_CalculatesEndTime()
+    {
+        var ics = string.Join("\r\n",
+            "BEGIN:VCALENDAR",
+            "VERSION:2.0",
+            "BEGIN:VEVENT",
+            "UID:duration-event-1",
+            "DTSTART:20231001T150000Z",
+            "DURATION:PT1H",
+            "SUMMARY:Duration Event",
+            "END:VEVENT",
+            "END:VCALENDAR"
+        );
+
+        var result = _parser.Parse(ics, new CalendarSource(), 48).ToList();
+
+        Assert.Single(result);
+        Assert.Equal(new DateTimeOffset(2023, 10, 1, 15, 0, 0, TimeSpan.Zero), result[0].Start);
+        Assert.Equal(new DateTimeOffset(2023, 10, 1, 16, 0, 0, TimeSpan.Zero), result[0].End);
     }
     
     [Fact]

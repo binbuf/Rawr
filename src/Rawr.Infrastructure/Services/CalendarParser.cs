@@ -80,48 +80,31 @@ public class CalendarParser : ICalendarParser
                 DateTimeOffset startDt;
                 try
                 {
-                    // Convert to UTC first using Ical.Net's internal resolution, then wrap in DateTimeOffset
-                    var utcDt = s.AsUtc;
-                    startDt = new DateTimeOffset(utcDt, TimeSpan.Zero);
+                    startDt = new DateTimeOffset(s.AsUtc, TimeSpan.Zero);
                 }
                 catch
                 {
-                    if (s.IsUtc)
-                    {
-                        startDt = new DateTimeOffset(s.Value, TimeSpan.Zero);
-                    }
-                    else
-                    {
-                        startDt = new DateTimeOffset(s.Value, TimeZoneInfo.Local.GetUtcOffset(s.Value));
-                    }
+                    startDt = s.IsUtc 
+                        ? new DateTimeOffset(s.Value, TimeSpan.Zero) 
+                        : new DateTimeOffset(s.Value, TimeZoneInfo.Local.GetUtcOffset(s.Value));
                 }
 
-                DateTimeOffset endDt;
-                var e = occurrence.Period.EndTime;
-                
-                if (e == null)
+                TimeSpan duration = TimeSpan.Zero;
+                if (evt.DtEnd != null && evt.DtStart != null)
                 {
-                    endDt = startDt;
+                    duration = evt.DtEnd.Value - evt.DtStart.Value;
                 }
-                else
+                else if (evt.Duration != null && evt.DtStart != null)
                 {
-                    try
-                    {
-                        var utcDt = e.AsUtc;
-                        endDt = new DateTimeOffset(utcDt, TimeSpan.Zero);
-                    }
-                    catch
-                    {
-                        if (e.IsUtc)
-                        {
-                            endDt = new DateTimeOffset(e.Value, TimeSpan.Zero);
-                        }
-                        else
-                        {
-                            endDt = new DateTimeOffset(e.Value, TimeZoneInfo.Local.GetUtcOffset(e.Value));
-                        }
-                    }
+                    duration = evt.DtStart.Add((Ical.Net.DataTypes.Duration)evt.Duration).Value - evt.DtStart.Value;
                 }
+                else if (occurrence.Period.EndTime != null && occurrence.Period.StartTime != null)
+                {
+                    duration = occurrence.Period.EndTime.Value - occurrence.Period.StartTime.Value;
+                }
+
+                DateTimeOffset endDt = startDt.Add(duration);
+
 
                 results.Add(new Rawr.Core.Models.CalendarEvent
                 {
