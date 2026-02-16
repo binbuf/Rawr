@@ -7,6 +7,7 @@
         x:Class="Rawr.SettingsWindow"
         x:DataType="vm:SettingsViewModel"
         Title="Rawr Settings"
+        Icon="/Assets/dinosaur.ico"
         Width="600" Height="500"
         WindowStartupLocation="CenterScreen">
 
