@@ -24,6 +24,8 @@ public partial class NotificationViewModel : ObservableObject
 
     public string Title => _calendarEvent.Title;
 
+    public bool IsIntervalAlert => _calendarEvent.Uid?.StartsWith("interval_") == true;
+
     public string Time
     {
         get
@@ -50,7 +52,7 @@ public partial class NotificationViewModel : ObservableObject
     {
         get
         {
-            if (_calendarEvent.IsAllDay)
+            if (_calendarEvent.IsAllDay || IsIntervalAlert)
                 return null;
 
             var originalTzId = _calendarEvent.OriginalTimeZoneId ?? TimeZoneInfo.Local.Id;
@@ -83,7 +85,7 @@ public partial class NotificationViewModel : ObservableObject
             string originalTimeStr;
             if (_calendarEvent.OriginalStartTime.HasValue && _calendarEvent.OriginalEndTime.HasValue)
             {
-                originalTimeStr = $"{_calendarEvent.OriginalStartTime.Value:t} - {_calendarEvent.OriginalEndTime.Value:t} ({originalTzAbbr})";
+                originalTimeStr = $"{_calendarEvent.OriginalStartTime.Value:t} - {_calendarEvent.OriginalEndTime.Value:t} {originalTzAbbr}";
             }
             else if (_calendarEvent.OriginalStartTime.HasValue)
             {

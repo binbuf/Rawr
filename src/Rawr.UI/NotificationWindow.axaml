@@ -22,7 +22,7 @@
             Padding="10">
         <Grid RowDefinitions="Auto, *, Auto">
             <StackPanel Grid.Row="0">
-                <TextBlock Text="Reminder" FontWeight="Bold" FontSize="12" Foreground="Gray" />
+                <TextBlock Text="Reminder" FontWeight="Bold" FontSize="12" Foreground="Gray" IsVisible="{Binding !IsIntervalAlert}" />
                 <TextBlock Text="{Binding Title}" FontWeight="Bold" FontSize="16" TextWrapping="Wrap" />
             </StackPanel>
 

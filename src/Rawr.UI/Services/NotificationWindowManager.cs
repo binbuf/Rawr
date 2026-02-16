@@ -150,11 +150,20 @@ public class NotificationWindowManager : IDisposable
                 return;
             }
 
-            string text = $"Reminder: {evt.Title}.";
 
-            if (!evt.IsAllDay)
+            // Improved speech for interval based alerts
+            string text;
+            if (evt.Uid?.StartsWith("interval_") == true)
             {
-                text += $" at {evt.Start.LocalDateTime:t}";
+                text = $"The time is {evt.Title}.";
+            }
+            else
+            {
+                text = $"Reminder: {evt.Title}.";
+                if (!evt.IsAllDay)
+                {
+                    text += $" at {evt.Start.LocalDateTime:t}";
+                }
             }
 
             var options = new VoiceOptions
