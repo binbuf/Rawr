@@ -122,4 +122,27 @@ public class CalendarParserTests
 
         Assert.Empty(result);
     }
+
+    [Fact]
+    public void Parse_SimpleEvent_PopulatesOriginalTimes()
+    {
+        var ics = string.Join("\r\n",
+            "BEGIN:VCALENDAR",
+            "VERSION:2.0",
+            "BEGIN:VEVENT",
+            "UID:original-times-1",
+            "DTSTART;TZID=America/Los_Angeles:20231001T150000",
+            "DTEND;TZID=America/Los_Angeles:20231001T160000",
+            "SUMMARY:Original Times",
+            "END:VEVENT",
+            "END:VCALENDAR"
+        );
+
+        var result = _parser.Parse(ics, new CalendarSource(), 48).ToList();
+
+        Assert.Single(result);
+        Assert.Equal(new DateTime(2023, 10, 1, 15, 0, 0), result[0].OriginalStartTime);
+        Assert.Equal(new DateTime(2023, 10, 1, 16, 0, 0), result[0].OriginalEndTime);
+        Assert.Equal("America/Los_Angeles", result[0].OriginalTimeZoneId);
+    }
 }

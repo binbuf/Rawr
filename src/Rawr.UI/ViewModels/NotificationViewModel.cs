@@ -76,15 +76,23 @@ public partial class NotificationViewModel : ObservableObject
                 return null;
             }
 
-            // If different, show original time/timezone
             var originalTzAbbr = originalTz != null 
                 ? GetTimeZoneAbbreviation(originalTz, _calendarEvent.Start.DateTime) 
                 : originalTzId;
 
-            // TODO: add end time here
-            var originalTimeStr = _calendarEvent.OriginalStartTime.HasValue 
-                ? $"{_calendarEvent.OriginalStartTime.Value:t} ({originalTzAbbr})" 
-                : $"({originalTzAbbr})";
+            string originalTimeStr;
+            if (_calendarEvent.OriginalStartTime.HasValue && _calendarEvent.OriginalEndTime.HasValue)
+            {
+                originalTimeStr = $"{_calendarEvent.OriginalStartTime.Value:t} - {_calendarEvent.OriginalEndTime.Value:t} ({originalTzAbbr})";
+            }
+            else if (_calendarEvent.OriginalStartTime.HasValue)
+            {
+                originalTimeStr = $"{_calendarEvent.OriginalStartTime.Value:t} ({originalTzAbbr})";
+            }
+            else
+            {
+                originalTimeStr = $"({originalTzAbbr})";
+            }
 
             return originalTimeStr;
         }

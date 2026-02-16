@@ -18,5 +18,6 @@ public class CalendarEvent
     public DateTime LocalEndTime => End.LocalDateTime;
 
     public DateTime? OriginalStartTime { get; set; }
+    public DateTime? OriginalEndTime { get; set; }
     public string? OriginalTimeZoneId { get; set; }
 }

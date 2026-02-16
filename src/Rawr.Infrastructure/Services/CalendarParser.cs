@@ -118,6 +118,7 @@ public class CalendarParser : ICalendarParser
                     SourceId = source.Id,
                     SourceName = source.Name,
                     OriginalStartTime = s.Value,
+                    OriginalEndTime = s.Value.Add(duration),
                     OriginalTimeZoneId = s.TzId
                 });
              }
