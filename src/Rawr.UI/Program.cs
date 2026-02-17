@@ -25,7 +25,10 @@ namespace Rawr
             }
 
             // Early initialization of settings to get log level
-            var settingsManager = new SettingsManager();
+            var credentialProtection = OperatingSystem.IsWindows()
+                ? (Core.Interfaces.ICredentialProtectionService)new Infrastructure.Services.WindowsCredentialProtectionService()
+                : new Infrastructure.Services.DummyCredentialProtectionService();
+            var settingsManager = new SettingsManager(credentialProtection);
             var config = settingsManager.Settings;
 
             // Map string level to Serilog level

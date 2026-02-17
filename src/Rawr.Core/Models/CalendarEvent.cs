@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace Rawr.Core.Models;
 
@@ -27,4 +28,9 @@ public class CalendarEvent
     public DateTime? OriginalStartTime { get; set; }
     public DateTime? OriginalEndTime { get; set; }
     public string? OriginalTimeZoneId { get; set; }
+
+    /// <summary>
+    /// Events that fire at the same time as this one and have been coalesced into a single notification.
+    /// </summary>
+    public List<CalendarEvent> SimultaneousEvents { get; set; } = new();
 }

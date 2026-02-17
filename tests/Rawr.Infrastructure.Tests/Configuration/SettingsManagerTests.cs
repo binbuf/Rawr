@@ -1,6 +1,8 @@
 using System;
 using System.IO;
+using Rawr.Core.Interfaces;
 using Rawr.Infrastructure.Configuration;
+using Rawr.Infrastructure.Services;
 using Xunit;
 
 namespace Rawr.Infrastructure.Tests.Configuration;
@@ -8,6 +10,7 @@ namespace Rawr.Infrastructure.Tests.Configuration;
 public class SettingsManagerTests : IDisposable
 {
     private readonly string _testBasePath;
+    private readonly ICredentialProtectionService _credentialProtection = new DummyCredentialProtectionService();
 
     public SettingsManagerTests()
     {
@@ -20,7 +23,7 @@ public class SettingsManagerTests : IDisposable
     public void Constructor_CreatesDefaultSettingsFile_WhenNoneExists()
     {
         // Arrange & Act
-        var manager = new SettingsManager(_testBasePath);
+        var manager = new SettingsManager(_credentialProtection, _testBasePath);
         var expectedPath = Path.Combine(_testBasePath, "Rawr", "settings.json");
 
         // Assert
@@ -33,7 +36,7 @@ public class SettingsManagerTests : IDisposable
     public void Save_PersistsChanges_ToDisk()
     {
         // Arrange
-        var manager = new SettingsManager(_testBasePath);
+        var manager = new SettingsManager(_credentialProtection, _testBasePath);
         manager.Settings.General.MissedEventThresholdMinutes = 120;
         manager.Settings.Logging.Level = "Debug";
 
@@ -42,7 +45,7 @@ public class SettingsManagerTests : IDisposable
 
         // Assert
         // Create a fresh manager pointing to the same path to verify reload
-        var newManager = new SettingsManager(_testBasePath);
+        var newManager = new SettingsManager(_credentialProtection, _testBasePath);
         Assert.Equal(120, newManager.Settings.General.MissedEventThresholdMinutes);
         Assert.Equal("Debug", newManager.Settings.Logging.Level);
     }

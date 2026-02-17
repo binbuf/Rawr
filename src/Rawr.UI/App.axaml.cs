@@ -74,13 +74,19 @@ namespace Rawr
             var alertScheduler = Services.GetRequiredService<IAlertScheduler>();
             var timeAwareness = Services.GetRequiredService<ITimeAwarenessService>();
             var periodicSync = Services.GetRequiredService<PeriodicSyncService>();
-            
+
             // Just resolve to instantiate and hook events
             Services.GetRequiredService<NotificationWindowManager>();
 
             _ = alertScheduler.StartAsync(CancellationToken.None);
             _ = timeAwareness.StartAsync(CancellationToken.None);
             _ = periodicSync.StartAsync(CancellationToken.None);
+
+            // Subscribe to power resume and time change events (Windows)
+            if (OperatingSystem.IsWindows())
+            {
+                SubscribeWindowsSystemEvents(alertScheduler);
+            }
 
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
@@ -92,7 +98,17 @@ namespace Rawr
 
         private void ConfigureServices(IServiceCollection services)
         {
-            services.AddSingleton<ISettingsManager, SettingsManager>();
+            if (OperatingSystem.IsWindows())
+            {
+                services.AddSingleton<ICredentialProtectionService, WindowsCredentialProtectionService>();
+            }
+            else
+            {
+                services.AddSingleton<ICredentialProtectionService, DummyCredentialProtectionService>();
+            }
+
+            services.AddSingleton<ISettingsManager>(sp =>
+                new SettingsManager(sp.GetRequiredService<ICredentialProtectionService>()));
             services.AddLogging(logging => logging.AddSerilog());
 
             services.AddSingleton(TimeProvider.System);
@@ -113,6 +129,12 @@ namespace Rawr
                 services.AddSingleton<IAudioPlaybackService, NAudioPlaybackService>();
                 services.AddSingleton<IOsIntegrationService, WindowsOsIntegrationService>();
             }
+            else if (OperatingSystem.IsMacOS())
+            {
+                services.AddSingleton<IVoiceService, DummyVoiceService>();
+                services.AddSingleton<IAudioPlaybackService, DummyPlaybackService>();
+                services.AddSingleton<IOsIntegrationService, MacOsIntegrationService>();
+            }
             else
             {
                 services.AddSingleton<IVoiceService, DummyVoiceService>();
@@ -122,6 +144,24 @@ namespace Rawr
 
             services.AddTransient<DashboardViewModel>();
             services.AddTransient<SettingsViewModel>();
+        }
+
+        [System.Runtime.Versioning.SupportedOSPlatform("windows")]
+        private static void SubscribeWindowsSystemEvents(IAlertScheduler alertScheduler)
+        {
+            Microsoft.Win32.SystemEvents.PowerModeChanged += (s, e) =>
+            {
+                if (e.Mode == Microsoft.Win32.PowerModes.Resume)
+                {
+                    Log.Information("System resumed from sleep");
+                    alertScheduler.OnSystemResumed();
+                }
+            };
+            Microsoft.Win32.SystemEvents.TimeChanged += (s, e) =>
+            {
+                Log.Information("System time changed");
+                alertScheduler.OnSystemResumed();
+            };
         }
 
         private void OnDashboardClick(object? sender, EventArgs e)

@@ -46,6 +46,9 @@ public partial class GeneralConfig : ObservableObject
 
     [ObservableProperty]
     private int _heartbeatIntervalSeconds = 30;
+
+    [ObservableProperty]
+    private int _gracePeriodSeconds = 120;
 }
 
 public partial class NotificationConfig : ObservableObject
@@ -64,6 +67,15 @@ public partial class NotificationConfig : ObservableObject
 
     [ObservableProperty]
     private bool _showLocalTimezone = true;
+
+    [ObservableProperty]
+    private int _defaultSnoozeMinutes = 10;
+
+    [ObservableProperty]
+    private bool _respectFocusAssist = true;
+
+    [ObservableProperty]
+    private bool _respectFocusAssistVoice = false;
 }
 
 public partial class TimeAwarenessConfig : ObservableObject

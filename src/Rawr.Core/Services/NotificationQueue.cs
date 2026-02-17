@@ -27,16 +27,46 @@ public class NotificationQueue : IDisposable
         _scheduler.AlertTriggered += OnAlertTriggered;
     }
 
+    private static readonly TimeSpan CoalesceWindow = TimeSpan.FromSeconds(60);
+
     private void OnAlertTriggered(object? sender, CalendarEvent evt)
     {
         _logger.LogInformation("NotificationQueue received alert: {Title}", evt.Title);
         lock (_lock)
         {
-            if (!_activeAlerts.Any(e => e.Uid == evt.Uid && e.Start == evt.Start))
+            if (_activeAlerts.Any(e => e.Uid == evt.Uid && e.Start == evt.Start))
+                return;
+
+            // Check for simultaneous events within the coalesce window
+            var simultaneous = _activeAlerts.FirstOrDefault(e =>
+                Math.Abs((e.Start - evt.Start).TotalSeconds) <= CoalesceWindow.TotalSeconds);
+
+            if (simultaneous != null)
             {
-                _activeAlerts.Add(evt);
-                AlertAdded?.Invoke(this, evt);
+                // Priority: Calendar > Interval. If same type, first arrival wins as primary.
+                if (evt.EventType == EventType.Calendar && simultaneous.EventType == EventType.Interval)
+                {
+                    // New calendar event takes priority over existing interval
+                    _activeAlerts.Remove(simultaneous);
+                    evt.SimultaneousEvents.Add(simultaneous);
+                    // Carry over any previously coalesced events
+                    evt.SimultaneousEvents.AddRange(simultaneous.SimultaneousEvents);
+                    simultaneous.SimultaneousEvents.Clear();
+                    _activeAlerts.Add(evt);
+                    AlertRemoved?.Invoke(this, simultaneous);
+                    AlertAdded?.Invoke(this, evt);
+                }
+                else
+                {
+                    // Existing keeps priority; add new as simultaneous
+                    simultaneous.SimultaneousEvents.Add(evt);
+                    _logger.LogInformation("Coalesced {NewTitle} into {ExistingTitle}", evt.Title, simultaneous.Title);
+                }
+                return;
             }
+
+            _activeAlerts.Add(evt);
+            AlertAdded?.Invoke(this, evt);
         }
     }
 

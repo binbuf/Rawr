@@ -7,6 +7,8 @@ using Rawr.Core.Models;
 using System;
 using System.Collections.Generic;
 using System.Net.Http;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -20,6 +22,7 @@ public class CalendarSyncService : ICalendarSyncService
     private readonly HttpClient _httpClient;
     private readonly ILogger<CalendarSyncService> _logger;
     private readonly ResiliencePipeline _resiliencePipeline;
+    private readonly Dictionary<string, string> _sourceHashes = new();
 
     public event Action<bool>? IsSyncingChanged;
 
@@ -68,9 +71,14 @@ public class CalendarSyncService : ICalendarSyncService
 
                 try
                 {
-                    var events = await SyncSourceAsync(source, lookAhead, cancellationToken);
+                    var (events, changed) = await SyncSourceAsync(source, lookAhead, cancellationToken);
+                    if (!changed)
+                    {
+                        _logger.LogDebug("Source {SourceName} hash unchanged, skipping", source.Name);
+                        continue;
+                    }
+
                     var eventList = events as List<CalendarEvent> ?? new List<CalendarEvent>(events);
-                    
                     await _repository.SaveEventsAsync(source.Id, eventList, cancellationToken);
                     allEvents.AddRange(eventList);
                 }
@@ -88,24 +96,29 @@ public class CalendarSyncService : ICalendarSyncService
         return allEvents;
     }
 
-    private async Task<IEnumerable<CalendarEvent>> SyncSourceAsync(CalendarSource source, int lookAhead, CancellationToken cancellationToken)
+    private async Task<(IEnumerable<CalendarEvent> Events, bool Changed)> SyncSourceAsync(CalendarSource source, int lookAhead, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(source.Uri))
         {
-            return Array.Empty<CalendarEvent>();
+            return (Array.Empty<CalendarEvent>(), false);
         }
 
         // Use Polly to fetch
         var icsContent = await _resiliencePipeline.ExecuteAsync(async ct =>
         {
-            // If Basic auth is needed, we would add headers here.
-            // For now, only PrivateUrl (no headers) is supported per task.
-            
             var response = await _httpClient.GetAsync(source.Uri, ct);
             response.EnsureSuccessStatusCode();
             return await response.Content.ReadAsStringAsync(ct);
         }, cancellationToken);
 
-        return _parser.Parse(icsContent, source, lookAhead);
+        // SHA256 change detection
+        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(icsContent)));
+        if (_sourceHashes.TryGetValue(source.Id, out var previousHash) && previousHash == hash)
+        {
+            return (Array.Empty<CalendarEvent>(), false);
+        }
+
+        _sourceHashes[source.Id] = hash;
+        return (_parser.Parse(icsContent, source, lookAhead), true);
     }
 }

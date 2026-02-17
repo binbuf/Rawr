@@ -1,3 +1,5 @@
+using Rawr.Core.Models;
+
 namespace Rawr.Core.Interfaces;
 
 public interface IOsIntegrationService
@@ -11,4 +13,9 @@ public interface IOsIntegrationService
     /// Returns true if a fullscreen application is currently active.
     /// </summary>
     bool IsFullscreen();
+
+    /// <summary>
+    /// Returns the current Focus Assist / Do Not Disturb state.
+    /// </summary>
+    FocusAssistState GetFocusAssistState();
 }

@@ -1,4 +1,5 @@
 using System.Windows.Input;
+using System.Collections.Generic;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Rawr.Core.Interfaces;
@@ -14,12 +15,14 @@ public partial class NotificationViewModel : ObservableObject
     private readonly CalendarEvent _calendarEvent;
     private readonly NotificationQueue _notificationQueue;
     private readonly ISettingsManager _settingsManager;
+    private readonly IAlertScheduler _scheduler;
 
-    public NotificationViewModel(CalendarEvent calendarEvent, NotificationQueue notificationQueue, ISettingsManager settingsManager)
+    public NotificationViewModel(CalendarEvent calendarEvent, NotificationQueue notificationQueue, ISettingsManager settingsManager, IAlertScheduler scheduler)
     {
         _calendarEvent = calendarEvent;
         _notificationQueue = notificationQueue;
         _settingsManager = settingsManager;
+        _scheduler = scheduler;
     }
 
     public string Title => _calendarEvent.Title;
@@ -103,6 +106,28 @@ public partial class NotificationViewModel : ObservableObject
     public string? Location => _calendarEvent.Location;
 
     public string? Description => _calendarEvent.Description;
+
+    public bool HasSimultaneousEvents => _calendarEvent.SimultaneousEvents.Count > 0;
+
+    public List<string> SimultaneousEventTitles =>
+        _calendarEvent.SimultaneousEvents.Select(e => e.Title).ToList();
+
+    public string SnoozeButtonText
+    {
+        get
+        {
+            var minutes = _settingsManager.Settings.Notifications.DefaultSnoozeMinutes;
+            return $"Snooze ({minutes}m)";
+        }
+    }
+
+    [RelayCommand]
+    public void Snooze()
+    {
+        var minutes = _settingsManager.Settings.Notifications.DefaultSnoozeMinutes;
+        _scheduler.SnoozeUntil = DateTimeOffset.Now.AddMinutes(minutes);
+        _notificationQueue.Dismiss(_calendarEvent);
+    }
 
     [RelayCommand]
     public void Dismiss()

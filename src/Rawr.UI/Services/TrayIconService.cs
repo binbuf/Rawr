@@ -16,6 +16,7 @@ namespace Rawr.Services
         private readonly WindowIcon _alertIcon;
 
         private readonly DispatcherTimer _timer;
+        private readonly DispatcherTimer _tooltipTimer;
         private readonly ICalendarSyncService _syncService;
         private readonly IAlertScheduler _scheduler;
         private readonly ISettingsManager _settingsManager;
@@ -45,6 +46,13 @@ namespace Rawr.Services
                 Interval = TimeSpan.FromMilliseconds(500)
             };
             _timer.Tick += Timer_Tick;
+
+            _tooltipTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromSeconds(30)
+            };
+            _tooltipTimer.Tick += (s, e) => UpdateTooltip();
+            _tooltipTimer.Start();
         }
 
         public void Initialize(TrayIcon trayIcon)
@@ -52,6 +60,22 @@ namespace Rawr.Services
             _trayIcon = trayIcon;
             _trayIcon.Icon = _idleIcon; // Set initial icon
             UpdateState();
+            UpdateTooltip();
+        }
+
+        private void UpdateTooltip()
+        {
+            if (_trayIcon == null) return;
+
+            if (_scheduler.NextAlertTime.HasValue && _scheduler.NextAlertDescription != null)
+            {
+                var localTime = _scheduler.NextAlertTime.Value.LocalDateTime;
+                _trayIcon.ToolTipText = $"Rawr - Next: {localTime:t} ({_scheduler.NextAlertDescription})";
+            }
+            else
+            {
+                _trayIcon.ToolTipText = "Rawr";
+            }
         }
 
         private void OnSyncingChanged(bool isSyncing)
@@ -155,6 +179,7 @@ namespace Rawr.Services
             _scheduler.AlertTriggered -= OnAlertTriggered;
             _alertResetTimer?.Stop();
             _timer.Stop();
+            _tooltipTimer.Stop();
         }
     }
 }

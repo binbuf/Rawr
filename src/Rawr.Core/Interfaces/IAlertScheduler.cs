@@ -28,7 +28,23 @@ public interface IAlertScheduler
     DateTimeOffset? SnoozeUntil { get; set; }
 
     /// <summary>
+    /// The time of the next upcoming alert, if any.
+    /// </summary>
+    DateTimeOffset? NextAlertTime { get; }
+
+    /// <summary>
+    /// A description of the next upcoming alert (event title or "Interval").
+    /// </summary>
+    string? NextAlertDescription { get; }
+
+    /// <summary>
     /// Manually triggers an alert for the specified event.
     /// </summary>
     void TriggerAlertManual(CalendarEvent evt);
+
+    /// <summary>
+    /// Called when the system resumes from sleep or the system time changes.
+    /// Cancels the current wait and immediately re-evaluates all events.
+    /// </summary>
+    void OnSystemResumed();
 }

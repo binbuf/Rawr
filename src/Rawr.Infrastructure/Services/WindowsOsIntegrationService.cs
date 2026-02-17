@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using Microsoft.Win32;
 using Rawr.Core.Interfaces;
+using Rawr.Core.Models;
 
 namespace Rawr.Infrastructure.Services;
 
@@ -60,6 +61,50 @@ public class WindowsOsIntegrationService : IOsIntegrationService
         }
 
         return false;
+    }
+
+    public FocusAssistState GetFocusAssistState()
+    {
+        try
+        {
+            // Windows 10+ Focus Assist / Quiet Hours via WNF (Windows Notification Facility)
+            // We use the undocumented NtQueryWnfStateData API to read the quiet hours state
+            int result = SHQueryUserNotificationState(out var state);
+            if (result == 0) // S_OK
+            {
+                return state switch
+                {
+                    QUERY_USER_NOTIFICATION_STATE.QUNS_NOT_PRESENT => FocusAssistState.Off,
+                    QUERY_USER_NOTIFICATION_STATE.QUNS_BUSY => FocusAssistState.PriorityOnly,
+                    QUERY_USER_NOTIFICATION_STATE.QUNS_RUNNING_D3D_FULL_SCREEN => FocusAssistState.AlarmsOnly,
+                    QUERY_USER_NOTIFICATION_STATE.QUNS_PRESENTATION_MODE => FocusAssistState.AlarmsOnly,
+                    QUERY_USER_NOTIFICATION_STATE.QUNS_ACCEPTS_NOTIFICATIONS => FocusAssistState.Off,
+                    QUERY_USER_NOTIFICATION_STATE.QUNS_QUIET_TIME => FocusAssistState.PriorityOnly,
+                    QUERY_USER_NOTIFICATION_STATE.QUNS_APP => FocusAssistState.PriorityOnly,
+                    _ => FocusAssistState.Off,
+                };
+            }
+        }
+        catch
+        {
+            // Ignore errors, assume Focus Assist is off
+        }
+
+        return FocusAssistState.Off;
+    }
+
+    [DllImport("shell32.dll")]
+    private static extern int SHQueryUserNotificationState(out QUERY_USER_NOTIFICATION_STATE pquns);
+
+    private enum QUERY_USER_NOTIFICATION_STATE
+    {
+        QUNS_NOT_PRESENT = 1,
+        QUNS_BUSY = 2,
+        QUNS_RUNNING_D3D_FULL_SCREEN = 3,
+        QUNS_PRESENTATION_MODE = 4,
+        QUNS_ACCEPTS_NOTIFICATIONS = 5,
+        QUNS_QUIET_TIME = 6,
+        QUNS_APP = 7
     }
 
     [DllImport("user32.dll")]

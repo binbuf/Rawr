@@ -19,6 +19,7 @@ public class AlertScheduler : IAlertScheduler, IDisposable
     private readonly ILogger<AlertScheduler> _logger;
     
     private CancellationTokenSource? _cts;
+    private CancellationTokenSource? _wakeCts;
     private Task? _schedulerTask;
     private readonly Dictionary<string, DateTimeOffset> _firedEvents = new(); // Key -> Event Start Time
     private readonly string _firedEventsPath;
@@ -26,6 +27,8 @@ public class AlertScheduler : IAlertScheduler, IDisposable
     public event EventHandler<CalendarEvent>? AlertTriggered;
 
     public DateTimeOffset? SnoozeUntil { get; set; }
+    public DateTimeOffset? NextAlertTime { get; private set; }
+    public string? NextAlertDescription { get; private set; }
 
     public AlertScheduler(
         ICalendarRepository repository,
@@ -96,14 +99,13 @@ public class AlertScheduler : IAlertScheduler, IDisposable
                     continue;
                 }
 
+                var gracePeriod = TimeSpan.FromSeconds(settings.GracePeriodSeconds);
                 var events = await _repository.GetAllEventsAsync(token);
                 var calendarSettings = _settingsManager.Settings.Calendar;
 
-                // 1. Process Due Events (Catch-up or Immediate)
-                // Event is due if:
-                // - Start <= Now
-                // - Start >= Now - Threshold
-                // - Not fired yet
+                // 1. Process Due Events (Grace period or Catch-up)
+                // Grace period: events missed by a small window (e.g. after sleep) fire normally
+                // Catch-up: events between grace and missed threshold fire with indicator
                 var dueEvents = events
                     .Where(e =>
                         e.Start <= now &&
@@ -114,7 +116,16 @@ public class AlertScheduler : IAlertScheduler, IDisposable
 
                 foreach (var evt in dueEvents)
                 {
-                    TriggerAlert(evt);
+                    var age = now - evt.Start;
+                    if (age > gracePeriod)
+                    {
+                        // Catch-up alert — event is older than grace period
+                        TriggerCatchUpAlert(evt);
+                    }
+                    else
+                    {
+                        TriggerAlert(evt);
+                    }
                 }
 
                 // 1b. Process Pre-Event Alerts (Alert before event starts)
@@ -144,6 +155,12 @@ public class AlertScheduler : IAlertScheduler, IDisposable
                     .Where(e => e.Start > now)
                     .OrderBy(e => e.Start)
                     .FirstOrDefault();
+
+                // Update next alert info for tray tooltip
+                NextAlertTime = nextEvent?.Start;
+                NextAlertDescription = nextEvent != null
+                    ? (nextEvent.EventType == EventType.Interval ? "Interval" : nextEvent.Title)
+                    : null;
 
                 var heartbeatDelay = TimeSpan.FromSeconds(settings.HeartbeatIntervalSeconds);
                 if (heartbeatDelay <= TimeSpan.Zero) heartbeatDelay = TimeSpan.FromSeconds(30); // Safety fallback
@@ -176,7 +193,22 @@ public class AlertScheduler : IAlertScheduler, IDisposable
                    // _logger.LogDebug("Waiting for {WaitTime}", waitTime);
                 }
 
-                await WaitAsync(waitTime, token);
+                // Create a wake CTS that can be cancelled by OnSystemResumed
+                _wakeCts = CancellationTokenSource.CreateLinkedTokenSource(token);
+                try
+                {
+                    await WaitAsync(waitTime, _wakeCts.Token);
+                }
+                catch (OperationCanceledException) when (!token.IsCancellationRequested)
+                {
+                    // Woken by OnSystemResumed, loop immediately
+                    _logger.LogInformation("Scheduler woken by system resume/time change");
+                }
+                finally
+                {
+                    _wakeCts.Dispose();
+                    _wakeCts = null;
+                }
             }
         }
         catch (OperationCanceledException)
@@ -214,6 +246,32 @@ public class AlertScheduler : IAlertScheduler, IDisposable
         AlertTriggered?.Invoke(this, evt);
     }
 
+    private void TriggerCatchUpAlert(CalendarEvent evt)
+    {
+        _logger.LogInformation("Triggering catch-up alert for event: {Title} at {Start}", evt.Title, evt.Start);
+        MarkAsFired(evt);
+        MarkAsFiredPreAlert(evt);
+
+        var catchUpEvent = new CalendarEvent
+        {
+            EventType = evt.EventType,
+            Uid = evt.Uid,
+            SourceId = evt.SourceId,
+            Title = $"{evt.Title} (catch-up)",
+            Start = evt.Start,
+            End = evt.End,
+            Description = evt.Description,
+            Location = evt.Location,
+            IsAllDay = evt.IsAllDay,
+            SourceName = evt.SourceName,
+            OriginalStartTime = evt.OriginalStartTime,
+            OriginalEndTime = evt.OriginalEndTime,
+            OriginalTimeZoneId = evt.OriginalTimeZoneId
+        };
+
+        AlertTriggered?.Invoke(this, catchUpEvent);
+    }
+
     private void TriggerPreAlert(CalendarEvent evt, int minutesBefore)
     {
         _logger.LogInformation("Triggering pre-alert for event: {Title} starting in {Minutes} minutes", evt.Title, minutesBefore);
@@ -232,6 +290,19 @@ public class AlertScheduler : IAlertScheduler, IDisposable
         };
 
         AlertTriggered?.Invoke(this, preAlertEvent);
+    }
+
+    public void OnSystemResumed()
+    {
+        _logger.LogInformation("System resumed or time changed, waking scheduler");
+        try
+        {
+            _wakeCts?.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // Already disposed, ignore
+        }
     }
 
     public void TriggerAlertManual(CalendarEvent evt)

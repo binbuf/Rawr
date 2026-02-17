@@ -21,8 +21,9 @@ public class NotificationWindowManager : IDisposable
     private readonly IAudioPlaybackService _audioPlaybackService;
     private readonly ISettingsManager _settingsManager;
     private readonly IOsIntegrationService _osIntegrationService;
+    private readonly IAlertScheduler _scheduler;
     private readonly ILogger<NotificationWindowManager> _logger;
-    
+
     private NotificationWindow? _currentWindow;
     private CalendarEvent? _currentEvent;
     private readonly DispatcherTimer _fullscreenCheckTimer;
@@ -35,6 +36,7 @@ public class NotificationWindowManager : IDisposable
         IAudioPlaybackService audioPlaybackService,
         ISettingsManager settingsManager,
         IOsIntegrationService osIntegrationService,
+        IAlertScheduler scheduler,
         ILogger<NotificationWindowManager> logger)
     {
         _notificationQueue = notificationQueue;
@@ -42,6 +44,7 @@ public class NotificationWindowManager : IDisposable
         _audioPlaybackService = audioPlaybackService;
         _settingsManager = settingsManager;
         _osIntegrationService = osIntegrationService;
+        _scheduler = scheduler;
         _logger = logger;
 
         _notificationQueue.AlertAdded += OnAlertAdded;
@@ -89,6 +92,12 @@ public class NotificationWindowManager : IDisposable
             return;
         }
 
+        if (config.RespectFocusAssist && _osIntegrationService.GetFocusAssistState() != FocusAssistState.Off)
+        {
+            CloseCurrentWindow();
+            return;
+        }
+
         // Get the oldest alert (FIFO) or maybe by time?
         // Let's go with the first one in the list which should be insertion order based on NotificationQueue logic
         var nextAlert = activeAlerts.First();
@@ -112,7 +121,7 @@ public class NotificationWindowManager : IDisposable
     {
         _currentEvent = evt;
         var config = _settingsManager.Settings.Notifications;
-        var vm = new NotificationViewModel(evt, _notificationQueue, _settingsManager);
+        var vm = new NotificationViewModel(evt, _notificationQueue, _settingsManager, _scheduler);
         _currentWindow = new NotificationWindow(vm, config);
         _currentWindow.Closed += (s, e) => 
         {
@@ -177,6 +186,13 @@ public class NotificationWindowManager : IDisposable
             var voiceSettings = _settingsManager.Settings.Voice;
             if (voiceSettings.Muted)
             {
+                return;
+            }
+
+            var notifConfig = _settingsManager.Settings.Notifications;
+            if (notifConfig.RespectFocusAssistVoice && _osIntegrationService.GetFocusAssistState() != FocusAssistState.Off)
+            {
+                _logger.LogInformation("Voice suppressed due to Focus Assist / DND");
                 return;
             }
 
