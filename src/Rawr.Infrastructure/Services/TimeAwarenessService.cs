@@ -15,6 +15,7 @@ public class TimeAwarenessService : ITimeAwarenessService, IDisposable
     private readonly ISettingsManager _settingsManager;
     private readonly IVoiceService _voiceService;
     private readonly IAudioPlaybackService _audioPlaybackService;
+    private readonly IAlertScheduler _alertScheduler;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<TimeAwarenessService> _logger;
 
@@ -25,12 +26,14 @@ public class TimeAwarenessService : ITimeAwarenessService, IDisposable
         ISettingsManager settingsManager,
         IVoiceService voiceService,
         IAudioPlaybackService audioPlaybackService,
+        IAlertScheduler alertScheduler,
         TimeProvider timeProvider,
         ILogger<TimeAwarenessService> logger)
     {
         _settingsManager = settingsManager;
         _voiceService = voiceService;
         _audioPlaybackService = audioPlaybackService;
+        _alertScheduler = alertScheduler;
         _timeProvider = timeProvider;
         _logger = logger;
     }
@@ -79,8 +82,7 @@ public class TimeAwarenessService : ITimeAwarenessService, IDisposable
                 var settings = _settingsManager.Settings.TimeAwareness;
                 if (!settings.Enabled)
                 {
-                    // Check again in a minute if enabled
-                    await Task.Delay(TimeSpan.FromMinutes(1), token);
+                    await Task.Delay(TimeSpan.FromSeconds(30), token);
                     continue;
                 }
 
@@ -88,8 +90,7 @@ public class TimeAwarenessService : ITimeAwarenessService, IDisposable
                 
                 if (!IsWithinSchedule(now, settings))
                 {
-                    // Check again in a minute if we are now in schedule
-                    await Task.Delay(TimeSpan.FromMinutes(1), token);
+                    await Task.Delay(TimeSpan.FromSeconds(30), token);
                     continue;
                 }
 
@@ -99,31 +100,56 @@ public class TimeAwarenessService : ITimeAwarenessService, IDisposable
                 if (delay.TotalMilliseconds > 0)
                 {
                     _logger.LogDebug("TimeAwarenessService waiting for {Delay} until {NextInterval}", delay, nextInterval);
-                    await Task.Delay(delay, token);
+                    try
+                    {
+                        await Task.Delay(delay, token);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        break;
+                    }
                 }
 
                 // Double check if still enabled and not cancelled
                 if (token.IsCancellationRequested) break;
                 
-                // Reload settings to get fresh config
                 settings = _settingsManager.Settings.TimeAwareness; 
                 if (!settings.Enabled || !IsWithinSchedule(_timeProvider.GetLocalNow(), settings)) continue;
 
-                await AnnounceTimeAsync(_timeProvider.GetLocalNow(), token);
+                // Trigger alerts (Audio and Visual)
+                await TriggerIntervalAlertAsync(nextInterval, settings.IntervalMinutes, token);
 
-                // Wait a tiny bit to avoid double triggering if calculation was slightly off (e.g. 1ms before minute)
-                await Task.Delay(TimeSpan.FromSeconds(2), token);
+                // Wait a tiny bit to avoid double triggering if calculation was slightly off
+                await Task.Delay(TimeSpan.FromSeconds(5), token);
             }
         }
         catch (OperationCanceledException)
         {
-            // Graceful shutdown
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error in TimeAwarenessService loop.");
             try { await Task.Delay(TimeSpan.FromMinutes(1), token); } catch { }
         }
+    }
+
+    public async Task TriggerIntervalAlertAsync(DateTimeOffset targetTime, int intervalMinutes, CancellationToken token)
+    {
+        // 1. Audio Announcement (using target time for consistency)
+        await AnnounceTimeAsync(targetTime, token);
+
+        // 2. Visual Notification (Meeting Alert style)
+        var intervalEvent = new CalendarEvent
+        {
+            Uid = $"interval_{targetTime.Ticks}",
+            Title = $"{targetTime:t}",
+            Start = targetTime,
+            End = targetTime.AddMinutes(intervalMinutes),
+            Description = $"Time awareness interval ({intervalMinutes} minutes)."
+        };
+
+        _logger.LogInformation("Triggering visual interval alert for {Title}", intervalEvent.Title);
+        _alertScheduler.TriggerAlertManual(intervalEvent);
     }
 
     private bool IsWithinSchedule(DateTimeOffset now, TimeAwarenessConfig settings)
@@ -137,9 +163,12 @@ public class TimeAwarenessService : ITimeAwarenessService, IDisposable
         var currentTime = now.TimeOfDay;
         
         var startTime = daySchedule.StartTime ?? TimeSpan.Zero;
+        // EndTime is inclusive for the entire minute. 
+        // If EndTime is 17:00, we want to allow the 17:00:59 mark.
         var endTime = daySchedule.EndTime ?? new TimeSpan(23, 59, 59);
+        var inclusiveEndTime = endTime.Add(TimeSpan.FromMinutes(1));
         
-        return currentTime >= startTime && currentTime <= endTime;
+        return currentTime >= startTime && currentTime < inclusiveEndTime;
     }
 
     public async Task TriggerTimeAnnouncementManual(DateTimeOffset? simulatedTime = null)

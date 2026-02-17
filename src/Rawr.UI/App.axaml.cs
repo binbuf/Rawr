@@ -351,7 +351,6 @@ namespace Rawr
         private void SimulateIntervalAlert(int minutes)
         {
             var timeAwareness = Services?.GetRequiredService<ITimeAwarenessService>();
-            var scheduler = Services?.GetRequiredService<IAlertScheduler>();
             if (timeAwareness == null) return;
 
             var now = DateTimeOffset.Now;
@@ -361,22 +360,8 @@ namespace Rawr
             
             next = new DateTimeOffset(next.Year, next.Month, next.Day, next.Hour, next.Minute, 0, now.Offset);
             
-            // Audio announcement
-            _ = timeAwareness.TriggerTimeAnnouncementManual(next);
-
-            // Visual notification (Meeting Alert)
-            if (scheduler != null)
-            {
-                var dummyEvent = new CalendarEvent
-                {
-                    Uid = $"interval_{next.Ticks}",
-                    Title = $"{next:t}",
-                    Start = next,
-                    End = next.AddHours(1),
-                    Description = $"Triggered {minutes} minute interval marker."
-                };
-                scheduler.TriggerAlertManual(dummyEvent);
-            }
+            // Trigger consolidated interval alert (Audio + Visual)
+            _ = timeAwareness.TriggerIntervalAlertAsync(next, minutes, CancellationToken.None);
         }
     }
 }

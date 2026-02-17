@@ -14,4 +14,9 @@ public interface ITimeAwarenessService
     /// </summary>
     /// <param name="simulatedTime">Optional time to simulate. If null, uses current time.</param>
     Task TriggerTimeAnnouncementManual(DateTimeOffset? simulatedTime = null);
+
+    /// <summary>
+    /// Triggers both audio and visual alerts for an interval marker.
+    /// </summary>
+    Task TriggerIntervalAlertAsync(DateTimeOffset targetTime, int intervalMinutes, CancellationToken token);
 }
