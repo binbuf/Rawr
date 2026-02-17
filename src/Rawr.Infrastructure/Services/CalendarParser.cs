@@ -36,14 +36,40 @@ public class CalendarParser : ICalendarParser
         {
             return Enumerable.Empty<Rawr.Core.Models.CalendarEvent>();
         }
-        
+
+        return ExtractEvents(calendar, source, lookAheadHours);
+    }
+
+    public IEnumerable<Rawr.Core.Models.CalendarEvent> Parse(Stream icsStream, CalendarSource source, int lookAheadHours)
+    {
+        if (icsStream == null || !icsStream.CanRead)
+        {
+            return Enumerable.Empty<Rawr.Core.Models.CalendarEvent>();
+        }
+
+        Ical.Net.Calendar calendar;
+        try
+        {
+            using var reader = new StreamReader(icsStream, leaveOpen: false);
+            calendar = Calendar.Load(reader);
+        }
+        catch
+        {
+            return Enumerable.Empty<Rawr.Core.Models.CalendarEvent>();
+        }
+
+        return ExtractEvents(calendar, source, lookAheadHours);
+    }
+
+    private IEnumerable<Rawr.Core.Models.CalendarEvent> ExtractEvents(Ical.Net.Calendar calendar, CalendarSource source, int lookAheadHours)
+    {
         if (calendar == null) return Enumerable.Empty<Rawr.Core.Models.CalendarEvent>();
 
         var now = _timeProvider.GetUtcNow();
         var searchEnd = now.AddHours(lookAheadHours);
 
         var startCal = new CalDateTime(now.UtcDateTime);
-        
+
         var results = new List<Rawr.Core.Models.CalendarEvent>();
 
         if (calendar.Events == null) return results;
@@ -53,9 +79,10 @@ public class CalendarParser : ICalendarParser
              if (evt == null) continue;
 
              IEnumerable<Occurrence> occurrences;
-             try 
+             try
              {
-                 occurrences = evt.GetOccurrences(startCal);
+                 var endCal = new CalDateTime(searchEnd.UtcDateTime);
+                 occurrences = evt.GetOccurrences(startCal).TakeWhileBefore(endCal);
              }
              catch
              {
@@ -70,7 +97,7 @@ public class CalendarParser : ICalendarParser
 
                 var s = occurrence.Period.StartTime;
                 if (s == null) continue;
-                
+
                 // Check if we passed the lookAhead window
                 if (s.Value > searchEnd.UtcDateTime)
                 {
@@ -84,8 +111,8 @@ public class CalendarParser : ICalendarParser
                 }
                 catch
                 {
-                    startDt = s.IsUtc 
-                        ? new DateTimeOffset(s.Value, TimeSpan.Zero) 
+                    startDt = s.IsUtc
+                        ? new DateTimeOffset(s.Value, TimeSpan.Zero)
                         : new DateTimeOffset(s.Value, TimeZoneInfo.Local.GetUtcOffset(s.Value));
                 }
 

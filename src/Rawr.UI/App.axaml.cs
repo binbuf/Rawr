@@ -332,8 +332,11 @@ namespace Rawr
                     var repo = Services?.GetRequiredService<ICalendarRepository>();
                     if (repo == null) return;
 
+                    var now = DateTimeOffset.UtcNow;
                     var evts = (await repo.GetAllEventsAsync(CancellationToken.None))
+                                    .Where(e => e.Start >= now)
                                     .OrderBy(o => o.Start)
+                                    .Take(20)
                                     .ToList();
 
                     Dispatcher.UIThread.Post(() => {

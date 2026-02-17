@@ -103,22 +103,27 @@ public class CalendarSyncService : ICalendarSyncService
             return (Array.Empty<CalendarEvent>(), false);
         }
 
-        // Use Polly to fetch
-        var icsContent = await _resiliencePipeline.ExecuteAsync(async ct =>
+        // Use Polly to fetch as a stream, avoiding large string allocations on the LOH
+        var responseStream = await _resiliencePipeline.ExecuteAsync(async ct =>
         {
-            var response = await _httpClient.GetAsync(source.Uri, ct);
+            var response = await _httpClient.GetAsync(source.Uri, HttpCompletionOption.ResponseHeadersRead, ct);
             response.EnsureSuccessStatusCode();
-            return await response.Content.ReadAsStringAsync(ct);
+            var ms = new MemoryStream();
+            await response.Content.CopyToAsync(ms, ct);
+            ms.Position = 0;
+            return ms;
         }, cancellationToken);
 
-        // SHA256 change detection
-        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(icsContent)));
+        // SHA256 change detection on raw bytes (avoids UTF-16 string expansion)
+        var hash = Convert.ToHexString(SHA256.HashData(responseStream.GetBuffer().AsSpan(0, (int)responseStream.Length)));
         if (_sourceHashes.TryGetValue(source.Id, out var previousHash) && previousHash == hash)
         {
+            responseStream.Dispose();
             return (Array.Empty<CalendarEvent>(), false);
         }
 
         _sourceHashes[source.Id] = hash;
-        return (_parser.Parse(icsContent, source, lookAhead), true);
+        responseStream.Position = 0;
+        return (_parser.Parse(responseStream, source, lookAhead), true);
     }
 }
