@@ -1,5 +1,7 @@
 using System;
 using System.Linq;
+using System.Threading;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Threading;
@@ -24,6 +26,8 @@ public class NotificationWindowManager : IDisposable
     private NotificationWindow? _currentWindow;
     private CalendarEvent? _currentEvent;
     private readonly DispatcherTimer _fullscreenCheckTimer;
+    private readonly Channel<CalendarEvent> _audioQueue = Channel.CreateUnbounded<CalendarEvent>();
+    private readonly CancellationTokenSource _audioQueueCts = new();
 
     public NotificationWindowManager(
         NotificationQueue notificationQueue,
@@ -49,13 +53,15 @@ public class NotificationWindowManager : IDisposable
         };
         _fullscreenCheckTimer.Tick += (s, e) => UpdateDisplay();
         _fullscreenCheckTimer.Start();
+
+        _ = ProcessAudioQueueAsync(_audioQueueCts.Token);
     }
 
     private void OnAlertAdded(object? sender, CalendarEvent evt)
     {
         _logger.LogInformation("OnAlertAdded: {Uid} - {Title}", evt.Uid, evt.Title);
-        // Play sound for every new alert
-        Task.Run(() => PlayAlertSound(evt));
+        // Queue sound for sequential playback
+        _audioQueue.Writer.TryWrite(evt);
 
         // Update UI
         Dispatcher.UIThread.Post(UpdateDisplay);
@@ -145,6 +151,25 @@ public class NotificationWindowManager : IDisposable
         }
     }
 
+    private async Task ProcessAudioQueueAsync(CancellationToken token)
+    {
+        try
+        {
+            await foreach (var evt in _audioQueue.Reader.ReadAllAsync(token))
+            {
+                await PlayAlertSound(evt);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Shutting down
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in audio queue processor");
+        }
+    }
+
     private async Task PlayAlertSound(CalendarEvent evt)
     {
         try
@@ -201,6 +226,9 @@ public class NotificationWindowManager : IDisposable
     public void Dispose()
     {
         _fullscreenCheckTimer.Stop();
+        _audioQueueCts.Cancel();
+        _audioQueue.Writer.Complete();
+        _audioQueueCts.Dispose();
         _notificationQueue.AlertAdded -= OnAlertAdded;
         _notificationQueue.AlertRemoved -= OnAlertRemoved;
         CloseCurrentWindow();

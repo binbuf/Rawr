@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -19,6 +21,7 @@ public class AlertScheduler : IAlertScheduler, IDisposable
     private CancellationTokenSource? _cts;
     private Task? _schedulerTask;
     private readonly Dictionary<string, DateTimeOffset> _firedEvents = new(); // Key -> Event Start Time
+    private readonly string _firedEventsPath;
 
     public event EventHandler<CalendarEvent>? AlertTriggered;
 
@@ -34,6 +37,8 @@ public class AlertScheduler : IAlertScheduler, IDisposable
         _settingsManager = settingsManager;
         _timeProvider = timeProvider;
         _logger = logger;
+        _firedEventsPath = Path.Combine(settingsManager.AppDataPath, "fired_events.json");
+        LoadFiredEvents();
     }
 
     public Task StartAsync(CancellationToken cancellationToken)
@@ -120,7 +125,8 @@ public class AlertScheduler : IAlertScheduler, IDisposable
                         .Where(e =>
                         {
                             var preAlertTime = e.Start - preAlertWindow;
-                            return preAlertTime <= now &&
+                            return e.Start > now &&
+                                   preAlertTime <= now &&
                                    preAlertTime >= now - missedThreshold &&
                                    !IsFiredPreAlert(e);
                         })
@@ -204,6 +210,7 @@ public class AlertScheduler : IAlertScheduler, IDisposable
     {
         _logger.LogInformation("Triggering alert for event: {Title} at {Start}", evt.Title, evt.Start);
         MarkAsFired(evt);
+        MarkAsFiredPreAlert(evt); // Suppress pre-alert if regular alert already fired
         AlertTriggered?.Invoke(this, evt);
     }
 
@@ -259,6 +266,7 @@ public class AlertScheduler : IAlertScheduler, IDisposable
         if (!_firedEvents.ContainsKey(key))
         {
             _firedEvents[key] = evt.Start;
+            SaveFiredEvents();
         }
     }
 
@@ -268,6 +276,7 @@ public class AlertScheduler : IAlertScheduler, IDisposable
         if (!_firedEvents.ContainsKey(key))
         {
             _firedEvents[key] = evt.Start;
+            SaveFiredEvents();
         }
     }
 
@@ -276,10 +285,51 @@ public class AlertScheduler : IAlertScheduler, IDisposable
         // Remove events that are older than threshold * 2 (just to be safe)
         var cutoff = now - (threshold * 2);
         var keysToRemove = _firedEvents.Where(kvp => kvp.Value < cutoff).Select(kvp => kvp.Key).ToList();
-        
+
+        if (keysToRemove.Count == 0) return;
+
         foreach (var key in keysToRemove)
         {
             _firedEvents.Remove(key);
+        }
+        SaveFiredEvents();
+    }
+
+    private void LoadFiredEvents()
+    {
+        try
+        {
+            if (!File.Exists(_firedEventsPath)) return;
+
+            var json = File.ReadAllText(_firedEventsPath);
+            var data = JsonSerializer.Deserialize<Dictionary<string, long>>(json);
+            if (data == null) return;
+
+            foreach (var (key, ticks) in data)
+            {
+                _firedEvents[key] = new DateTimeOffset(ticks, TimeSpan.Zero);
+            }
+            _logger.LogInformation("Loaded {Count} fired events from disk", _firedEvents.Count);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to load fired events from disk, starting fresh");
+        }
+    }
+
+    private void SaveFiredEvents()
+    {
+        try
+        {
+            var data = _firedEvents.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Ticks);
+            var json = JsonSerializer.Serialize(data);
+            var dir = Path.GetDirectoryName(_firedEventsPath);
+            if (dir != null) Directory.CreateDirectory(dir);
+            File.WriteAllText(_firedEventsPath, json);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to save fired events to disk");
         }
     }
 

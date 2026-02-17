@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -75,6 +76,7 @@ public class AlertSchedulerTests
         _config = new RawrConfig();
         _config.General.HeartbeatIntervalSeconds = 3600; // 1 hour, to test event wait time logic
         _settingsMock.Setup(s => s.Settings).Returns(_config);
+        _settingsMock.Setup(s => s.AppDataPath).Returns(Path.Combine(Path.GetTempPath(), "RawrTests_" + Guid.NewGuid().ToString("N")));
     }
 
     [Fact]
