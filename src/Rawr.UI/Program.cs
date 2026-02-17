@@ -46,6 +46,7 @@ namespace Rawr
             Log.Logger = new LoggerConfiguration()
                 .MinimumLevel.Is(level)
                 .WriteTo.Console()
+                .WriteTo.Debug()
                 .WriteTo.File(
                     path: logPath,
                     rollingInterval: RollingInterval.Day,

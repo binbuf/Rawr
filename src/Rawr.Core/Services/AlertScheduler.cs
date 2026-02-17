@@ -92,6 +92,7 @@ public class AlertScheduler : IAlertScheduler, IDisposable
                 }
 
                 var events = await _repository.GetAllEventsAsync(token);
+                var calendarSettings = _settingsManager.Settings.Calendar;
 
                 // 1. Process Due Events (Catch-up or Immediate)
                 // Event is due if:
@@ -99,8 +100,8 @@ public class AlertScheduler : IAlertScheduler, IDisposable
                 // - Start >= Now - Threshold
                 // - Not fired yet
                 var dueEvents = events
-                    .Where(e => 
-                        e.Start <= now && 
+                    .Where(e =>
+                        e.Start <= now &&
                         e.Start >= now - missedThreshold &&
                         !IsFired(e))
                     .OrderBy(e => e.Start)
@@ -109,6 +110,27 @@ public class AlertScheduler : IAlertScheduler, IDisposable
                 foreach (var evt in dueEvents)
                 {
                     TriggerAlert(evt);
+                }
+
+                // 1b. Process Pre-Event Alerts (Alert before event starts)
+                if (calendarSettings.AlertBeforeEvent && calendarSettings.AlertBeforeEventMinutes > 0)
+                {
+                    var preAlertWindow = TimeSpan.FromMinutes(calendarSettings.AlertBeforeEventMinutes);
+                    var preAlertDueEvents = events
+                        .Where(e =>
+                        {
+                            var preAlertTime = e.Start - preAlertWindow;
+                            return preAlertTime <= now &&
+                                   preAlertTime >= now - missedThreshold &&
+                                   !IsFiredPreAlert(e);
+                        })
+                        .OrderBy(e => e.Start)
+                        .ToList();
+
+                    foreach (var evt in preAlertDueEvents)
+                    {
+                        TriggerPreAlert(evt, calendarSettings.AlertBeforeEventMinutes);
+                    }
                 }
 
                 // 2. Determine wait time for next event
@@ -125,6 +147,17 @@ public class AlertScheduler : IAlertScheduler, IDisposable
                 if (nextEvent != null)
                 {
                     var timeToEvent = nextEvent.Start - now;
+
+                    // Also consider pre-alert time
+                    if (calendarSettings.AlertBeforeEvent && calendarSettings.AlertBeforeEventMinutes > 0)
+                    {
+                        var timeToPreAlert = timeToEvent - TimeSpan.FromMinutes(calendarSettings.AlertBeforeEventMinutes);
+                        if (timeToPreAlert > TimeSpan.Zero && timeToPreAlert < timeToEvent)
+                        {
+                            timeToEvent = timeToPreAlert;
+                        }
+                    }
+
                     if (timeToEvent < heartbeatDelay)
                     {
                         waitTime = timeToEvent;
@@ -174,6 +207,26 @@ public class AlertScheduler : IAlertScheduler, IDisposable
         AlertTriggered?.Invoke(this, evt);
     }
 
+    private void TriggerPreAlert(CalendarEvent evt, int minutesBefore)
+    {
+        _logger.LogInformation("Triggering pre-alert for event: {Title} starting in {Minutes} minutes", evt.Title, minutesBefore);
+        MarkAsFiredPreAlert(evt);
+
+        var preAlertEvent = new CalendarEvent
+        {
+            Uid = $"prealert_{evt.Uid}_{evt.Start.Ticks}",
+            SourceId = evt.SourceId,
+            Title = $"{evt.Title} (in {minutesBefore} min)",
+            Start = evt.Start,
+            End = evt.End,
+            Description = evt.Description,
+            Location = evt.Location,
+            IsAllDay = evt.IsAllDay
+        };
+
+        AlertTriggered?.Invoke(this, preAlertEvent);
+    }
+
     public void TriggerAlertManual(CalendarEvent evt)
     {
         _logger.LogInformation("Manually triggering alert for event: {Title}", evt.Title);
@@ -185,14 +238,33 @@ public class AlertScheduler : IAlertScheduler, IDisposable
         return $"{evt.SourceId}_{evt.Uid}_{evt.Start.Ticks}";
     }
 
+    private string GetPreAlertKey(CalendarEvent evt)
+    {
+        return $"prealert_{evt.SourceId}_{evt.Uid}_{evt.Start.Ticks}";
+    }
+
     private bool IsFired(CalendarEvent evt)
     {
         return _firedEvents.ContainsKey(GetKey(evt));
     }
 
+    private bool IsFiredPreAlert(CalendarEvent evt)
+    {
+        return _firedEvents.ContainsKey(GetPreAlertKey(evt));
+    }
+
     private void MarkAsFired(CalendarEvent evt)
     {
         var key = GetKey(evt);
+        if (!_firedEvents.ContainsKey(key))
+        {
+            _firedEvents[key] = evt.Start;
+        }
+    }
+
+    private void MarkAsFiredPreAlert(CalendarEvent evt)
+    {
+        var key = GetPreAlertKey(evt);
         if (!_firedEvents.ContainsKey(key))
         {
             _firedEvents[key] = evt.Start;

@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Threading;
+using Microsoft.Extensions.Logging;
 using Rawr.Core.Configuration;
 using Rawr.Core.Interfaces;
 using Rawr.Core.Models;
@@ -18,6 +19,7 @@ public class NotificationWindowManager : IDisposable
     private readonly IAudioPlaybackService _audioPlaybackService;
     private readonly ISettingsManager _settingsManager;
     private readonly IOsIntegrationService _osIntegrationService;
+    private readonly ILogger<NotificationWindowManager> _logger;
     
     private NotificationWindow? _currentWindow;
     private CalendarEvent? _currentEvent;
@@ -28,13 +30,15 @@ public class NotificationWindowManager : IDisposable
         IVoiceService voiceService,
         IAudioPlaybackService audioPlaybackService,
         ISettingsManager settingsManager,
-        IOsIntegrationService osIntegrationService)
+        IOsIntegrationService osIntegrationService,
+        ILogger<NotificationWindowManager> logger)
     {
         _notificationQueue = notificationQueue;
         _voiceService = voiceService;
         _audioPlaybackService = audioPlaybackService;
         _settingsManager = settingsManager;
         _osIntegrationService = osIntegrationService;
+        _logger = logger;
 
         _notificationQueue.AlertAdded += OnAlertAdded;
         _notificationQueue.AlertRemoved += OnAlertRemoved;
@@ -49,6 +53,7 @@ public class NotificationWindowManager : IDisposable
 
     private void OnAlertAdded(object? sender, CalendarEvent evt)
     {
+        _logger.LogInformation("OnAlertAdded: {Uid} - {Title}", evt.Uid, evt.Title);
         // Play sound for every new alert
         Task.Run(() => PlayAlertSound(evt));
 
@@ -144,22 +149,28 @@ public class NotificationWindowManager : IDisposable
     {
         try
         {
-            // Skip audio for interval based alerts, as TimeAwarenessService handles them
-            if (evt.Uid?.StartsWith("interval_") == true)
-            {
-                return;
-            }
-
             var voiceSettings = _settingsManager.Settings.Voice;
             if (voiceSettings.Muted)
             {
                 return;
             }
 
-            string text = $"Reminder: {evt.Title}.";
-            if (!evt.IsAllDay)
+            string text;
+            if (evt.Uid?.StartsWith("interval_") == true)
             {
-                text += $" at {evt.Start.LocalDateTime:t}";
+                // Time awareness interval alerts announce the time
+                var t = evt.Start.LocalDateTime;
+                text = t.Minute == 0
+                    ? $"The time is {t.ToString("%h")} {t.ToString("tt")}"
+                    : $"The time is {t.ToString("%h")} {t.ToString("mm")} {t.ToString("tt")}";
+            }
+            else
+            {
+                text = $"Reminder: {evt.Title}.";
+                if (!evt.IsAllDay)
+                {
+                    text += $" at {evt.Start.LocalDateTime:t}";
+                }
             }
 
             var options = new VoiceOptions
@@ -169,15 +180,21 @@ public class NotificationWindowManager : IDisposable
                 Volume = voiceSettings.Volume
             };
 
+            _logger.LogInformation("PlayAlertSound synthesizing: {Text}", text);
             using var audio = await _voiceService.SynthesizeAsync(text, options);
-            if (audio != null)
+            if (audio != null && audio.Length > 0)
             {
+                _logger.LogInformation("PlayAlertSound playing audio stream ({Length} bytes)", audio.Length);
                 await _audioPlaybackService.PlayAsync(audio, voiceSettings.DeviceId);
             }
+            else
+            {
+                _logger.LogWarning("PlayAlertSound: synthesis returned null or empty stream");
+            }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // Log error?
+            _logger.LogError(ex, "Error in PlayAlertSound");
         }
     }
 

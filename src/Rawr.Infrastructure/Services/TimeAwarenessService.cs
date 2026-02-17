@@ -135,10 +135,7 @@ public class TimeAwarenessService : ITimeAwarenessService, IDisposable
 
     public async Task TriggerIntervalAlertAsync(DateTimeOffset targetTime, int intervalMinutes, CancellationToken token)
     {
-        // 1. Audio Announcement (using target time for consistency)
-        await AnnounceTimeAsync(targetTime, token);
-
-        // 2. Visual Notification (Meeting Alert style)
+        // Visual Notification (Meeting Alert style)
         var intervalEvent = new CalendarEvent
         {
             Uid = $"interval_{targetTime.Ticks}",
@@ -148,7 +145,9 @@ public class TimeAwarenessService : ITimeAwarenessService, IDisposable
             Description = $"Time awareness interval ({intervalMinutes} minutes)."
         };
 
-        _logger.LogInformation("Triggering visual interval alert for {Title}", intervalEvent.Title);
+        _logger.LogInformation("Triggering interval alert for {Title}", intervalEvent.Title);
+
+        // Fire alert — NotificationWindowManager handles both visual and audio
         _alertScheduler.TriggerAlertManual(intervalEvent);
     }
 

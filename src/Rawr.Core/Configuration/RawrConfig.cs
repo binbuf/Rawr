@@ -115,6 +115,12 @@ public partial class CalendarConfig : ObservableObject
 
     [ObservableProperty]
     private int _syncIntervalMinutes = 15;
+
+    [ObservableProperty]
+    private bool _alertBeforeEvent = false;
+
+    [ObservableProperty]
+    private int _alertBeforeEventMinutes = 15;
 }
 
 public partial class CalendarSource : ObservableObject
