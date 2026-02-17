@@ -181,7 +181,7 @@ public class NotificationWindowManager : IDisposable
             }
 
             string text;
-            if (evt.Uid?.StartsWith("interval_") == true)
+            if (evt.EventType == EventType.Interval)
             {
                 // Time awareness interval alerts announce the time
                 var t = evt.Start.LocalDateTime;

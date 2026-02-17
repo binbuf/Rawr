@@ -2,8 +2,15 @@ using System;
 
 namespace Rawr.Core.Models;
 
+public enum EventType
+{
+    Calendar,
+    Interval
+}
+
 public class CalendarEvent
 {
+    public EventType EventType { get; set; } = EventType.Calendar;
     public string Uid { get; set; } = string.Empty;
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }

@@ -21,16 +21,25 @@
             CornerRadius="8" 
             Padding="10">
         <Grid RowDefinitions="Auto, *, Auto">
-            <StackPanel Grid.Row="0">
-                <TextBlock Text="Reminder" FontWeight="Bold" FontSize="12" Foreground="Gray" IsVisible="{Binding !IsIntervalAlert}" />
+            <!-- Calendar event header -->
+            <StackPanel Grid.Row="0" IsVisible="{Binding !IsIntervalAlert}">
+                <TextBlock Text="Reminder" FontWeight="Bold" FontSize="12" Foreground="Gray" />
                 <TextBlock Text="{Binding Title}" FontWeight="Bold" FontSize="16" TextWrapping="Wrap" />
             </StackPanel>
 
-            <StackPanel Grid.Row="1" VerticalAlignment="Center">
-                <TextBlock Text="{Binding Time}" FontSize="14" IsVisible="{Binding !IsIntervalAlert}" />
+            <!-- Calendar event details -->
+            <StackPanel Grid.Row="1" VerticalAlignment="Center" IsVisible="{Binding !IsIntervalAlert}">
+                <TextBlock Text="{Binding Time}" FontSize="14" />
                 <TextBlock Text="{Binding OriginalTimeInfo}" FontSize="11" Foreground="Gray" IsVisible="{Binding OriginalTimeInfo, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                 <TextBlock Text="{Binding Location}" FontSize="12" FontStyle="Italic" TextWrapping="Wrap" IsVisible="{Binding Location, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
             </StackPanel>
+
+            <!-- Interval alert: large centered time -->
+            <TextBlock Grid.Row="0" Grid.RowSpan="2"
+                       Text="{Binding Title}"
+                       FontSize="32" FontWeight="Bold"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                       IsVisible="{Binding IsIntervalAlert}" />
 
             <Button Grid.Row="2" Content="Dismiss" Command="{Binding DismissCommand}" HorizontalAlignment="Right" />
         </Grid>

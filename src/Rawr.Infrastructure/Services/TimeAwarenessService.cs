@@ -138,6 +138,7 @@ public class TimeAwarenessService : ITimeAwarenessService, IDisposable
         // Visual Notification (Meeting Alert style)
         var intervalEvent = new CalendarEvent
         {
+            EventType = EventType.Interval,
             Uid = $"interval_{targetTime.Ticks}",
             Title = $"{targetTime:t}",
             Start = targetTime,

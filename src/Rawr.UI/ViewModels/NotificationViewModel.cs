@@ -24,7 +24,7 @@ public partial class NotificationViewModel : ObservableObject
 
     public string Title => _calendarEvent.Title;
 
-    public bool IsIntervalAlert => _calendarEvent.Uid?.StartsWith("interval_") == true;
+    public bool IsIntervalAlert => _calendarEvent.EventType == EventType.Interval;
 
     public string Time
     {
