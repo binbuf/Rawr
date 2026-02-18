@@ -11,12 +11,14 @@ using System.Linq;
 
 namespace Rawr.ViewModels;
 
-public partial class DashboardViewModel : ObservableObject
+public partial class DashboardViewModel : ObservableObject, IDisposable
 {
     private readonly ICalendarRepository _calendarRepository;
     private readonly ICalendarSyncService _syncService;
     private readonly ISettingsManager _settingsManager;
     private readonly NotificationQueue _notificationQueue;
+    private readonly EventHandler<CalendarEvent> _onAlertAdded;
+    private readonly EventHandler<CalendarEvent> _onAlertRemoved;
 
     [ObservableProperty]
     private string _syncStatus = "Idle";
@@ -41,164 +43,93 @@ public partial class DashboardViewModel : ObservableObject
         // Initialize active alerts
         ActiveAlerts = new ObservableCollection<CalendarEvent>(_notificationQueue.GetActiveAlerts());
 
-        _notificationQueue.AlertAdded += (s, e) => 
+        _onAlertAdded = (s, e) =>
             Avalonia.Threading.Dispatcher.UIThread.Post(() => ActiveAlerts.Add(e));
-            
-        _notificationQueue.AlertRemoved += (s, e) => 
-            Avalonia.Threading.Dispatcher.UIThread.Post(() => {
-                                  var toRemove = ActiveAlerts.FirstOrDefault(x => x.Uid == e.Uid && x.Start == e.Start);
-                                  if (toRemove != null) ActiveAlerts.Remove(toRemove);
-                             });
-                             
-                         _syncService.IsSyncingChanged += OnSyncingChanged;
-                 
-                         RefreshEvents();
-                     }
-                 
-                     private void OnSyncingChanged(bool isSyncing)
-                     {
-                         Avalonia.Threading.Dispatcher.UIThread.Post(async () =>
-                         {
-                             SyncStatus = isSyncing ? "Syncing..." : $"Synced at {DateTime.Now:t}";
-                             if (!isSyncing)
-                             {
-                                 await RefreshEventsAsync();
-                             }
-                         });
-                     }
-                 
-                     // Default constructor for design-time
 
-            public DashboardViewModel() 
-
+        _onAlertRemoved = (s, e) =>
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
+                var toRemove = ActiveAlerts.FirstOrDefault(x => x.Uid == e.Uid && x.Start == e.Start);
+                if (toRemove != null) ActiveAlerts.Remove(toRemove);
+            });
 
-                _calendarRepository = null!;
+        _notificationQueue.AlertAdded += _onAlertAdded;
+        _notificationQueue.AlertRemoved += _onAlertRemoved;
+        _syncService.IsSyncingChanged += OnSyncingChanged;
 
-                _syncService = null!;
+        RefreshEvents();
+    }
 
-                _settingsManager = null!;
-
-                _notificationQueue = null!;
-
-            }
-
-        
-
-            [RelayCommand]
-
-            private void DismissAlert(CalendarEvent evt)
-
+    private void OnSyncingChanged(bool isSyncing)
+    {
+        Avalonia.Threading.Dispatcher.UIThread.Post(async () =>
+        {
+            SyncStatus = isSyncing ? "Syncing..." : $"Synced at {DateTime.Now:t}";
+            if (!isSyncing)
             {
-
-                _notificationQueue.Dismiss(evt);
-
-            }
-
-        
-
-            [RelayCommand]
-
-            private async Task SyncNow()
-
-            {
-
-                SyncStatus = "Syncing...";
-
-                try
-
-                {
-
-                    await _syncService.SyncAsync(CancellationToken.None);
-
-                    SyncStatus = $"Synced at {DateTime.Now:t}";
-
-                    await RefreshEventsAsync();
-
-                }
-
-                catch (Exception ex)
-
-                {
-
-                    SyncStatus = $"Failed: {ex.Message}";
-
-                }
-
-            }
-
-        
-
-            public async void RefreshEvents()
-
-            {
-
                 await RefreshEventsAsync();
-
             }
+        });
+    }
 
-        
+    // Default constructor for design-time
+    public DashboardViewModel()
+    {
+        _calendarRepository = null!;
+        _syncService = null!;
+        _settingsManager = null!;
+        _notificationQueue = null!;
+        _onAlertAdded = null!;
+        _onAlertRemoved = null!;
+    }
 
-                public async Task RefreshEventsAsync()
+    [RelayCommand]
+    private void DismissAlert(CalendarEvent evt)
+    {
+        _notificationQueue.Dismiss(evt);
+    }
 
-        
-
-                {
-
-        
-
-                    if (_calendarRepository == null) return;
-
-        
-
-            
-
-        
-
-                    var allEvents = await _calendarRepository.GetAllEventsAsync();
-
-        
-
-                    var now = DateTimeOffset.Now;
-
-        
-
-                    var threshold = now.AddMinutes(-_settingsManager.Settings.General.MissedEventThresholdMinutes);
-
-        
-
-                    var end = now.AddHours(_settingsManager.Settings.Calendar.LookAheadHours);
-
-        
-
-            
-
-        
-
-                    var events = allEvents
-
-        
-
-                        .Where(e => e.End >= now && e.Start <= end || e.Start >= threshold && e.Start <= end)
-
-        
-
-                        .OrderBy(e => e.Start);
-
-        
-
-                        
-
-        
-
-                    UpcomingEvents = new ObservableCollection<CalendarEvent>(events);
-
-        
-
-                }
-
-        
-
-            
-
+    [RelayCommand]
+    private async Task SyncNow()
+    {
+        SyncStatus = "Syncing...";
+        try
+        {
+            await _syncService.SyncAsync(CancellationToken.None);
+            SyncStatus = $"Synced at {DateTime.Now:t}";
+            await RefreshEventsAsync();
         }
+        catch (Exception ex)
+        {
+            SyncStatus = $"Failed: {ex.Message}";
+        }
+    }
+
+    public async void RefreshEvents()
+    {
+        await RefreshEventsAsync();
+    }
+
+    public async Task RefreshEventsAsync()
+    {
+        if (_calendarRepository == null) return;
+
+        var allEvents = await _calendarRepository.GetAllEventsAsync();
+        var now = DateTimeOffset.Now;
+        var threshold = now.AddMinutes(-_settingsManager.Settings.General.MissedEventThresholdMinutes);
+        var end = now.AddHours(_settingsManager.Settings.Calendar.LookAheadHours);
+
+        var events = allEvents
+            .Where(e => e.End >= now && e.Start <= end || e.Start >= threshold && e.Start <= end)
+            .OrderBy(e => e.Start);
+
+        UpcomingEvents = new ObservableCollection<CalendarEvent>(events);
+    }
+
+    public void Dispose()
+    {
+        _notificationQueue.AlertAdded -= _onAlertAdded;
+        _notificationQueue.AlertRemoved -= _onAlertRemoved;
+        _syncService.IsSyncingChanged -= OnSyncingChanged;
+    }
+}

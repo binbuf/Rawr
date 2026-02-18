@@ -27,7 +27,8 @@ public class NotificationWindowManager : IDisposable
     private NotificationWindow? _currentWindow;
     private CalendarEvent? _currentEvent;
     private readonly DispatcherTimer _fullscreenCheckTimer;
-    private readonly Channel<CalendarEvent> _audioQueue = Channel.CreateUnbounded<CalendarEvent>();
+    private readonly Channel<CalendarEvent> _audioQueue = Channel.CreateBounded<CalendarEvent>(
+        new BoundedChannelOptions(10) { FullMode = BoundedChannelFullMode.DropOldest });
     private readonly CancellationTokenSource _audioQueueCts = new();
 
     public NotificationWindowManager(
@@ -137,7 +138,7 @@ public class NotificationWindowManager : IDisposable
         // Auto-hide logic
         if (config.DurationSeconds > 0)
         {
-            Task.Delay(TimeSpan.FromSeconds(config.DurationSeconds)).ContinueWith(_ =>
+            Task.Delay(TimeSpan.FromSeconds(config.DurationSeconds), _audioQueueCts.Token).ContinueWith(_ =>
             {
                 Dispatcher.UIThread.Post(() =>
                 {
@@ -146,7 +147,7 @@ public class NotificationWindowManager : IDisposable
                         _notificationQueue.Dismiss(evt);
                     }
                 });
-            });
+            }, TaskContinuationOptions.OnlyOnRanToCompletion);
         }
     }
 

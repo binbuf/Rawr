@@ -373,9 +373,6 @@ namespace Rawr
             refreshEventsItem.Click += (s, e) => PopulateEventMenu();
             eventBasedMenu.Items.Add(refreshEventsItem);
 
-            // Auto-populate on creation
-            PopulateEventMenu();
-
             debugMenu.Items.Add(eventBasedItem);
             menu.Items.Add(debugItem);
 #endif

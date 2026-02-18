@@ -13,6 +13,8 @@ namespace Rawr.Infrastructure.Persistence;
 
 public class CalendarRepository : ICalendarRepository
 {
+    private static readonly JsonSerializerOptions _writeOptions = new() { WriteIndented = true };
+
     private readonly ISettingsManager _settingsManager;
     private readonly ILogger<CalendarRepository> _logger;
     private readonly SemaphoreSlim _semaphore = new(1, 1);
@@ -80,18 +82,18 @@ public class CalendarRepository : ICalendarRepository
                 _eventsBySource.Add(sourceId, events.ToList());
             }
 
-            // Persist to disk (Flatten)
+            // Persist to disk (Flatten) — stream directly to avoid LOH string allocation
             var allEvents = _eventsBySource.Values.SelectMany(x => x).ToList();
-            var json = JsonSerializer.Serialize(allEvents, new JsonSerializerOptions { WriteIndented = true });
-            
-            // Ensure directory exists (SettingsManager usually handles creating the root, but good to be safe)
+
+            // Ensure directory exists
             var dir = Path.GetDirectoryName(_storagePath);
             if (dir != null && !Directory.Exists(dir))
             {
                 Directory.CreateDirectory(dir);
             }
 
-            await File.WriteAllTextAsync(_storagePath, json, cancellationToken);
+            await using var fs = new FileStream(_storagePath, FileMode.Create, FileAccess.Write, FileShare.None, 4096, useAsync: true);
+            await JsonSerializer.SerializeAsync(fs, allEvents, _writeOptions, cancellationToken);
             _logger.LogDebug("Saved {Count} events to storage.", allEvents.Count);
         }
         finally

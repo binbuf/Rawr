@@ -124,6 +124,14 @@ public class CalendarSyncService : ICalendarSyncService
 
         _sourceHashes[source.Id] = hash;
         responseStream.Position = 0;
-        return (_parser.Parse(responseStream, source, lookAhead), true);
+        try
+        {
+            return (_parser.Parse(responseStream, source, lookAhead), true);
+        }
+        catch
+        {
+            responseStream.Dispose();
+            throw;
+        }
     }
 }

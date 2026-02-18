@@ -69,6 +69,14 @@ public class CalendarParser : ICalendarParser
         var searchEnd = now.AddHours(lookAheadHours);
 
         var startCal = new CalDateTime(now.UtcDateTime);
+        var endCal = new CalDateTime(searchEnd.UtcDateTime);
+
+        // Limit recurrence evaluation to prevent runaway memory usage on events
+        // with infinite or very long-running recurrence rules.
+        var evalOptions = new Ical.Net.Evaluation.EvaluationOptions
+        {
+            MaxUnmatchedIncrementsLimit = 1000
+        };
 
         var results = new List<Rawr.Core.Models.CalendarEvent>();
 
@@ -81,8 +89,7 @@ public class CalendarParser : ICalendarParser
              IEnumerable<Occurrence> occurrences;
              try
              {
-                 var endCal = new CalDateTime(searchEnd.UtcDateTime);
-                 occurrences = evt.GetOccurrences(startCal).TakeWhileBefore(endCal);
+                 occurrences = evt.GetOccurrences(startCal, evalOptions).TakeWhileBefore(endCal);
              }
              catch
              {
@@ -131,7 +138,6 @@ public class CalendarParser : ICalendarParser
                 }
 
                 DateTimeOffset endDt = startDt.Add(duration);
-
 
                 results.Add(new Rawr.Core.Models.CalendarEvent
                 {
