@@ -6,9 +6,9 @@ using Rawr.Core.Interfaces;
 using Rawr.Core.Models;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Net.Http;
 using System.Security.Cryptography;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -23,6 +23,7 @@ public class CalendarSyncService : ICalendarSyncService
     private readonly ILogger<CalendarSyncService> _logger;
     private readonly ResiliencePipeline _resiliencePipeline;
     private readonly Dictionary<string, string> _sourceHashes = new();
+    private readonly string _icsCacheDir;
 
     public event Action<bool>? IsSyncingChanged;
 
@@ -38,6 +39,9 @@ public class CalendarSyncService : ICalendarSyncService
         _repository = repository;
         _httpClient = httpClient;
         _logger = logger;
+
+        _icsCacheDir = Path.Combine(_settingsManager.AppDataPath, "ics-cache");
+        Directory.CreateDirectory(_icsCacheDir);
 
         // Configure Polly
         _resiliencePipeline = new ResiliencePipelineBuilder()
@@ -90,6 +94,14 @@ public class CalendarSyncService : ICalendarSyncService
         }
         finally
         {
+            // Reclaim LOH memory from Ical.Net Calendar object graphs.
+            // Must be blocking + compacting to actually return LOH memory to the OS.
+            System.Runtime.GCSettings.LargeObjectHeapCompactionMode = System.Runtime.GCLargeObjectHeapCompactionMode.CompactOnce;
+            GC.Collect(2, GCCollectionMode.Aggressive, blocking: true, compacting: true);
+
+            _logger.LogInformation("Post-sync GC: managed heap {HeapSize} MB",
+                GC.GetTotalMemory(false) / (1024 * 1024));
+
             IsSyncingChanged?.Invoke(false);
         }
 
@@ -103,26 +115,43 @@ public class CalendarSyncService : ICalendarSyncService
             return (Array.Empty<CalendarEvent>(), false);
         }
 
-        // Fetch ICS content into a MemoryStream (needed for SHA256 hashing before parse)
-        using var responseStream = await _resiliencePipeline.ExecuteAsync(async ct =>
+        var cacheFile = Path.Combine(_icsCacheDir, $"{source.Id}.ics");
+
+        // Stream HTTP response directly to disk — no MemoryStream, no LOH allocation
+        await _resiliencePipeline.ExecuteAsync(async ct =>
         {
             using var response = await _httpClient.GetAsync(source.Uri, HttpCompletionOption.ResponseHeadersRead, ct);
             response.EnsureSuccessStatusCode();
-            var ms = new MemoryStream();
-            await response.Content.CopyToAsync(ms, ct);
-            ms.Position = 0;
-            return ms;
+            await using var fs = new FileStream(cacheFile, FileMode.Create, FileAccess.Write, FileShare.None, 8192, useAsync: true);
+            await response.Content.CopyToAsync(fs, ct);
         }, cancellationToken);
 
-        // SHA256 change detection on raw bytes (avoids UTF-16 string expansion)
-        var hash = Convert.ToHexString(SHA256.HashData(responseStream.GetBuffer().AsSpan(0, (int)responseStream.Length)));
+        // Compute SHA256 hash by streaming from disk (no byte array in memory)
+        string hash;
+        {
+            using var hashStream = new FileStream(cacheFile, FileMode.Open, FileAccess.Read, FileShare.Read, 8192, useAsync: true);
+            var hashBytes = await SHA256.HashDataAsync(hashStream, cancellationToken);
+            hash = Convert.ToHexString(hashBytes);
+        }
+
         if (_sourceHashes.TryGetValue(source.Id, out var previousHash) && previousHash == hash)
         {
             return (Array.Empty<CalendarEvent>(), false);
         }
 
         _sourceHashes[source.Id] = hash;
-        responseStream.Position = 0;
-        return (_parser.Parse(responseStream, source, lookAhead), true);
+
+        // Parse from disk file — Ical.Net Calendar object is scoped to the Parse method
+        // and becomes eligible for GC as soon as Parse returns the materialized event list
+        List<CalendarEvent> events;
+        {
+            using var parseStream = new FileStream(cacheFile, FileMode.Open, FileAccess.Read, FileShare.Read, 8192, useAsync: true);
+            events = new List<CalendarEvent>(_parser.Parse(parseStream, source, lookAhead));
+        }
+
+        _logger.LogInformation("Parsed {Count} events from source {SourceName} ({FileSize} bytes on disk)",
+            events.Count, source.Name, new FileInfo(cacheFile).Length);
+
+        return (events, true);
     }
 }
