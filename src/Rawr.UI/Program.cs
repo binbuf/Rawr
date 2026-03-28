@@ -25,9 +25,11 @@ namespace Rawr
             }
 
             // Early initialization of settings to get log level
-            var credentialProtection = OperatingSystem.IsWindows()
-                ? (Core.Interfaces.ICredentialProtectionService)new Infrastructure.Services.WindowsCredentialProtectionService()
-                : new Infrastructure.Services.DummyCredentialProtectionService();
+#if WINDOWS
+            var credentialProtection = (Core.Interfaces.ICredentialProtectionService)new Infrastructure.Services.WindowsCredentialProtectionService();
+#else
+            var credentialProtection = (Core.Interfaces.ICredentialProtectionService)new Infrastructure.Services.DummyCredentialProtectionService();
+#endif
             var settingsManager = new SettingsManager(credentialProtection);
             var config = settingsManager.Settings;
 

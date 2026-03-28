@@ -7,10 +7,20 @@
   <ItemGroup>
     <PackageReference Include="Ical.Net" Version="5.2.1" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.3" />
-    <PackageReference Include="NAudio" Version="2.2.1" />
     <PackageReference Include="Polly" Version="8.6.5" />
+  </ItemGroup>
+
+  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
+    <PackageReference Include="NAudio" Version="2.2.1" />
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="9.0.4" />
     <PackageReference Include="System.Speech" Version="10.0.3" />
+  </ItemGroup>
+
+  <ItemGroup Condition="!$([MSBuild]::IsOSPlatform('Windows'))">
+    <Compile Remove="Services\WindowsVoiceService.cs" />
+    <Compile Remove="Services\NAudioPlaybackService.cs" />
+    <Compile Remove="Services\WindowsCredentialProtectionService.cs" />
+    <Compile Remove="Services\WindowsOsIntegrationService.cs" />
   </ItemGroup>
 
   <PropertyGroup>

@@ -82,11 +82,10 @@ namespace Rawr
             _ = timeAwareness.StartAsync(CancellationToken.None);
             _ = periodicSync.StartAsync(CancellationToken.None);
 
+#if WINDOWS
             // Subscribe to power resume and time change events (Windows)
-            if (OperatingSystem.IsWindows())
-            {
-                SubscribeWindowsSystemEvents(alertScheduler);
-            }
+            SubscribeWindowsSystemEvents(alertScheduler);
+#endif
 
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
@@ -98,14 +97,11 @@ namespace Rawr
 
         private void ConfigureServices(IServiceCollection services)
         {
-            if (OperatingSystem.IsWindows())
-            {
-                services.AddSingleton<ICredentialProtectionService, WindowsCredentialProtectionService>();
-            }
-            else
-            {
-                services.AddSingleton<ICredentialProtectionService, DummyCredentialProtectionService>();
-            }
+#if WINDOWS
+            services.AddSingleton<ICredentialProtectionService, WindowsCredentialProtectionService>();
+#else
+            services.AddSingleton<ICredentialProtectionService, DummyCredentialProtectionService>();
+#endif
 
             services.AddSingleton<ISettingsManager>(sp =>
                 new SettingsManager(sp.GetRequiredService<ICredentialProtectionService>()));
@@ -123,16 +119,15 @@ namespace Rawr
             services.AddSingleton<NotificationWindowManager>();
             services.AddSingleton<TrayIconService>();
 
-            if (OperatingSystem.IsWindows())
+#if WINDOWS
+            services.AddSingleton<IVoiceService, WindowsVoiceService>();
+            services.AddSingleton<IAudioPlaybackService, NAudioPlaybackService>();
+            services.AddSingleton<IOsIntegrationService, WindowsOsIntegrationService>();
+#else
+            if (OperatingSystem.IsMacOS())
             {
-                services.AddSingleton<IVoiceService, WindowsVoiceService>();
-                services.AddSingleton<IAudioPlaybackService, NAudioPlaybackService>();
-                services.AddSingleton<IOsIntegrationService, WindowsOsIntegrationService>();
-            }
-            else if (OperatingSystem.IsMacOS())
-            {
-                services.AddSingleton<IVoiceService, DummyVoiceService>();
-                services.AddSingleton<IAudioPlaybackService, DummyPlaybackService>();
+                services.AddSingleton<IVoiceService, MacOsVoiceService>();
+                services.AddSingleton<IAudioPlaybackService, MacOsAudioPlaybackService>();
                 services.AddSingleton<IOsIntegrationService, MacOsIntegrationService>();
             }
             else
@@ -141,11 +136,13 @@ namespace Rawr
                 services.AddSingleton<IAudioPlaybackService, DummyPlaybackService>();
                 services.AddSingleton<IOsIntegrationService, DummyOsIntegrationService>();
             }
+#endif
 
             services.AddTransient<DashboardViewModel>();
             services.AddTransient<SettingsViewModel>();
         }
 
+#if WINDOWS
         [System.Runtime.Versioning.SupportedOSPlatform("windows")]
         private static void SubscribeWindowsSystemEvents(IAlertScheduler alertScheduler)
         {
@@ -163,6 +160,7 @@ namespace Rawr
                 alertScheduler.OnSystemResumed();
             };
         }
+#endif
 
         private void OnDashboardClick(object? sender, EventArgs e)
         {

@@ -18,12 +18,12 @@ Rawr lives in your system tray, syncs your calendars via iCal/ICS URLs, and anno
 | Feature | Windows | macOS | Linux |
 |---|---|---|---|
 | Calendar sync | Yes | Yes | Yes |
-| Voice (TTS) | Yes | TODO | TODO |
-| Audio playback | Yes | TODO | TODO |
+| Voice (TTS) | Yes (SAPI) | Yes (`say`) | TODO |
+| Audio playback | Yes (NAudio) | Yes (`afplay`) | TODO |
 | System tray | Yes | Yes | Yes |
-| Start on boot | Yes | Yes | TODO |
-| Fullscreen detection | Yes | TODO | TODO |
-| Credential storage | Yes (Credential Manager) | TODO | TODO |
+| Start on boot | Yes (Registry) | Yes (LaunchAgent) | TODO |
+| Fullscreen detection | Yes | No | TODO |
+| Credential storage | Yes (DPAPI) | No (plaintext) | TODO |
 
 ## Prerequisites
 
@@ -31,7 +31,7 @@ Rawr lives in your system tray, syncs your calendars via iCal/ICS URLs, and anno
 
 ### macOS
 
-> **TODO:** macOS voice and audio services are not yet implemented (stub only). OS integration (boot, fullscreen, keychain) is partially implemented. See [docs/CrossPlatformTasks.md](docs/CrossPlatformTasks.md).
+Requires macOS with the `say` and `afplay` commands (included by default on all macOS versions). Voice synthesis uses the system `say` command and audio playback uses `afplay`. Calendar source URLs are stored in plaintext in the settings file (Keychain integration is not yet implemented).
 
 ### Linux
 
