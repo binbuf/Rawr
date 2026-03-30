@@ -1,0 +1,125 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version number (e.g. 1.0.0)"
+        required: true
+
+env:
+  DOTNET_VERSION: "10.0.x"
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Extract version
+        id: version
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Test
+        run: dotnet test -c Release --verbosity normal
+
+      - name: Publish
+        run: >
+          dotnet publish src/Rawr.UI/Rawr.UI.csproj
+          -c Release
+          -r win-x64
+          --self-contained true
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:Version=${{ steps.version.outputs.VERSION }}
+          -o publish/win-x64
+
+      - name: Build Installer (Inno Setup)
+        run: iscc /DAPP_VERSION="${{ steps.version.outputs.VERSION }}" packaging/windows/rawr.iss
+
+      - name: Upload Windows Installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: packaging/windows/Output/Rawr-Setup.exe
+
+  build-macos:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Extract version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Test
+        run: dotnet test -c Release --verbosity normal
+
+      - name: Publish
+        run: >
+          dotnet publish src/Rawr.UI/Rawr.UI.csproj
+          -c Release
+          -r osx-arm64
+          --self-contained true
+          -p:Version=${{ steps.version.outputs.VERSION }}
+          -o publish/osx-arm64
+
+      - name: Install create-dmg
+        run: brew install create-dmg
+
+      - name: Build DMG
+        run: |
+          chmod +x packaging/macos/build-dmg.sh
+          packaging/macos/build-dmg.sh "${{ steps.version.outputs.VERSION }}"
+
+      - name: Upload macOS DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-dmg
+          path: packaging/macos/output/Rawr.dmg
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build-windows, build-macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            windows-installer/Rawr-Setup.exe
+            macos-dmg/Rawr.dmg
+          generate_release_notes: true
