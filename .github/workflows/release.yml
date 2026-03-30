@@ -34,10 +34,10 @@ jobs:
           fi
 
       - name: Restore
-        run: dotnet restore
+        run: dotnet restore Rawr.sln
 
       - name: Test
-        run: dotnet test -c Release --verbosity normal
+        run: dotnet test Rawr.sln -c Release --verbosity normal
 
       - name: Publish
         run: >
@@ -79,10 +79,10 @@ jobs:
           fi
 
       - name: Restore
-        run: dotnet restore
+        run: dotnet restore Rawr.sln
 
       - name: Test
-        run: dotnet test -c Release --verbosity normal
+        run: dotnet test Rawr.sln -c Release --verbosity normal
 
       - name: Publish
         run: >
