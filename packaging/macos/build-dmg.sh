@@ -3,11 +3,13 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-PUBLISH_DIR="$REPO_ROOT/publish/osx-arm64"
+VERSION="${1:-1.0.0}"
+RID="${2:-osx-arm64}"
+ARCH_SUFFIX="${RID#osx-}"
+PUBLISH_DIR="$REPO_ROOT/publish/$RID"
 APP_NAME="Rawr"
 APP_BUNDLE="$SCRIPT_DIR/$APP_NAME.app"
 OUTPUT_DIR="$SCRIPT_DIR/output"
-VERSION="${1:-1.0.0}"
 
 # --- Convert .ico to .icns ---
 ICONSET_DIR="$SCRIPT_DIR/Rawr.iconset"
@@ -60,7 +62,7 @@ cp "$SCRIPT_DIR/Rawr.icns" "$APP_BUNDLE/Contents/Resources/"
 mkdir -p "$OUTPUT_DIR"
 
 # Remove existing DMG if present (create-dmg fails otherwise)
-rm -f "$OUTPUT_DIR/Rawr.dmg"
+rm -f "$OUTPUT_DIR/Rawr-${ARCH_SUFFIX}.dmg"
 
 create-dmg \
     --volname "$APP_NAME" \
@@ -71,7 +73,7 @@ create-dmg \
     --icon "$APP_NAME.app" 150 185 \
     --app-drop-link 450 185 \
     --hide-extension "$APP_NAME.app" \
-    "$OUTPUT_DIR/Rawr.dmg" \
+    "$OUTPUT_DIR/Rawr-${ARCH_SUFFIX}.dmg" \
     "$APP_BUNDLE"
 
-echo "DMG created: $OUTPUT_DIR/Rawr.dmg"
+echo "DMG created: $OUTPUT_DIR/Rawr-${ARCH_SUFFIX}.dmg"
